@@ -1,0 +1,213 @@
+;; EEditor keybindings — this file *is* the shortcut table. Edit it and save (⌘S): it reloads
+;; immediately. Delete it and EEditor falls back to these defaults.
+;;
+;;   (bind "Key" body…)
+;;
+;; Key: modifiers joined with "-" or "+", then the key. Mod = ⌘ on macOS, Ctrl elsewhere;
+;; Cmd, Ctrl, Alt (Option) and Shift can also be named directly.  e.g. "Mod-i", "Mod-Shift-f",
+;; "Ctrl-Alt-t". Every binding needs a modifier (function keys and Escape may go bare).
+;;
+;; The body is EELisp, evaluated on the engine when the key fires. It returns editor commands:
+;;
+;;   (ed-cmd "save")                 run a built-in command (list at the bottom)
+;;   (ed-insert text)                insert at the cursor, caret after the text
+;;   (ed-insert-at pos text)
+;;   (ed-goto pos)                   caret to an absolute offset
+;;   (ed-goto-line n)                caret to the start of line n (1-based)
+;;   (ed-select from to)
+;;   (ed-replace text)               replace the selection
+;;   (ed-replace-range from to text)
+;;   (ed-set-buffer text)            replace the whole document
+;;   (ed-open "notes/x.md")          open a file in a tab
+;;   (ed-new path)                   create the note if it doesn't exist, then open it
+;;   (ed-new path text)              …with text as its starting content
+;;   (ed-form "Contacts")            open a .eeform and run it, in a window beside your notes
+;;   (ed-message text)               toast
+;;   (ed-notify title body)          toast, and a system notification when EEditor isn't in front
+;;   (ed-prompt "When?" my-fn)       ask; then (my-fn answer) runs like a key. Optional default and
+;;                                   choices: (ed-prompt "Tag?" my-fn "" (list "work" "home"))
+;;   (ed-append "inbox.md" text)     add to the end of a note, open or not — created if missing
+;;   (ed-append path text "## Log")  …at the end of that section (added if it isn't there)
+;;   (ed-write path text)            replace a note's text; (ed-write path text old) only if it
+;;                                   still says old — so a note being typed into is left alone
+;;
+;; Reading other notes: (notes) lists every .md in the workspace, (notes "reviews") those in a
+;; folder; (read-note "inbox.md") is one's text as saved (nil if there's none). Unsaved tabs are
+;; saved before any binding runs, so what you read is what's on screen.
+;;
+;; A binding may list several commands; they run in order against the live document.
+;; Anything the standard bundle (the REPL's "snippets" button) defines is callable here too.
+;;
+;; (on-start body…) runs the same kind of commands once, when EEditor has loaded the workspace —
+;; it decides which note you land on. Without it, EEditor opens welcome.md while that's still
+;; around, and today's note after that. See the bottom of this file.
+;;
+;; (on-load body…) is for definitions — your own functions, tables, a library like the PIM's. It
+;; runs at launch before on-start, and again every time this file is saved, so an edit to a
+;; helper takes effect on ⌘S. Its value is ignored: it's not for commands.
+;;
+;; (on-tick body…) runs once a minute, on the minute, with the same context as a key, and its
+;; commands are carried out — (ed-notify …) for a reminder, say. Keep it quick.
+;;
+;; There may be several on-load and on-tick forms; each runs, in order.
+;;
+;; Context, defined fresh before every run:
+;;   *file*        path of the current note        *cursor*   caret offset
+;;   *line*        caret line (1-based)            *col*      caret column (1-based)
+;;   *line-text*   text of the caret's line        *lines*    line count
+;;   *line-from*  *line-to*   where the caret's line starts and ends — offsets for ed-replace-range
+;;   *sel-from*  *sel-to*                          *selection*  the selected text
+;;   *buffer*      the whole document
+;;   *date* "YYYY-MM-DD"   *time* "HH:MM"   *now* "YYYY-MM-DD HH:MM:SS"   (local time)
+;;
+;; (*selection* and *buffer* are only computed when the binding mentions them.)
+
+;; ── app commands ───────────────────────────────────────────────────────────
+(bind "Mod-s"       (ed-cmd "save"))
+(bind "Mod-p"       (ed-cmd "quick-open"))
+(bind "Mod-Shift-f" (ed-cmd "search"))
+(bind "Mod-d"       (ed-cmd "daily-note"))
+(bind "Mod-Shift-n" (ed-cmd "new-file"))
+(bind "Mod-j"       (ed-cmd "toggle-repl"))
+(bind "Mod-e"       (ed-cmd "toggle-preview"))
+(bind "Mod-Shift-k" (ed-cmd "open-keys"))
+
+;; ── lisp ───────────────────────────────────────────────────────────────────
+
+;; ⌘I — a new note stamped with the minute, e.g. "2026-08-09 1430.md", with the same stamp as
+;; its heading. Press it twice in the same minute and you land back in the same note.
+;; (No ":" in the name — Finder shows a colon as a "/".)
+(bind "Mod-i"
+  (ed-new (str *date* " " (str-replace *time* ":" "") ".md")
+          (str "# " *date* " " *time* "\n\n")))
+
+;; ⌘⇧I — a timestamped "## " heading at the caret, caret on the blank line under it.
+(bind "Mod-Shift-i"
+  (ed-insert (str (cond (= *col* 1) "" true "\n") "## " *time* "\n\n")))
+
+;; A few more ideas — uncomment to enable:
+;;
+;; ⌘⌥I — the same heading, but at the top of the note (line 2)
+;; (bind "Mod-Alt-i" (ed-goto-line 2) (ed-insert (str "## " *date* " " *time* "\n\n")))
+;;
+;; ⌘B — wrap the selection in bold
+;; (bind "Mod-b" (ed-replace (str "**" *selection* "**")))
+;;
+;; ⌘⇧T — a "- [ ] " task line
+;; (bind "Mod-Shift-t" (ed-insert "- [ ] "))
+;;
+;; ⌘⌥D — the day of the week, spelled out
+;; (bind "Mod-Alt-d" (ed-insert (date-format *date* "EEEE")))
+;;
+;; ⌘⇧B — link back to today's note
+;; (bind "Mod-Shift-b" (ed-insert (str "[[" *date* "]]")))
+
+;; ── what opens at launch ───────────────────────────────────────────────────
+;; Uncomment one. With every (on-start …) commented out, EEditor falls back to welcome.md — or,
+;; once that's gone, to today's note, creating it if it isn't there yet.
+;;
+;; (on-start (ed-open "todo.md"))              ;; always this note
+;; (on-start (ed-cmd "daily-note"))            ;; today's note, created if needed
+;; (on-start (ed-new (str *date* ".md")))      ;; the same, spelled out
+;; (on-start)                                  ;; nothing — start on an empty editor
+;;
+;; *date*, *time* and *now* are set here as well; the rest of the context describes the caret,
+;; which at launch has no note to point at yet (*file* is "").
+
+;; ── built-in commands ──────────────────────────────────────────────────────
+;; save · quick-open · search · daily-note · new-file · new-sheet · new-form · new-mindmap · new-folder
+;; open-keys
+;; open-functions      your own spreadsheet functions (.eeditor/functions.eelisp), created if needed
+;; reload-functions    load them again (saving the file does this too)
+;; reload-keys · toggle-repl · focus-repl · toggle-preview · toggle-theme · export-pdf · snippets
+;; theme-dark · theme-light · theme-vb6   pick a theme (toggle-theme walks all three)
+;; calendar · agenda-setup · agenda-refresh · close-tab · next-tab · prev-tab · focus-editor
+;; form-design · form-code · form-run   the active form tab's mode
+;; mindmap-map · mindmap-text          the active mind map tab: the map, or its markdown outline
+;; open-file           pick a file from anywhere; asks whether to copy it in or edit it in place
+;; copy-into-workspace turn the current ↗ (outside) note into a copy in the workspace
+;; add-samples         add the sample notes and the PIM tour to this folder (keeps what is there)
+;; about               who makes EEditor, and which version this is
+;; insert-image        pick images; each is copied into assets/ beside the note and linked at the caret
+
+;; ══ Zero to Hero — chapter 2. Your first shortcut ══════════════════════════════
+
+(on-load
+  (defn open-tasks (path)
+    (length (filter (fn (line) (str-starts-with line "- [ ]"))
+                    (str-split (read-note path) "\n"))))
+
+  ;; meetings/2026-10-26 Budget review.md
+  (defn meeting-path (title) (str "meetings/" *date* " " title ".md"))
+
+  (defn meeting-template (title)
+    (str "# " title "\n\n" *date* " " *time* "\n\n"
+         "## Who\n\n- \n\n## Notes\n\n\n## Decisions\n\n- \n\n## Actions\n\n- [ ] \n"))
+
+  ;; what the meeting key calls with your answer
+  (defn new-meeting (title) (ed-new (meeting-path title) (meeting-template title)))
+
+  ;; "call the bank" → "- [ ] call the bank"; a line that is a task already stays one
+  (defn as-task (line)
+    (let (text (str-trim line))
+      (cond (str-starts-with text "- [") text
+            (str-starts-with text "- ")  (str "- [ ] " (substr text 2 (str-len text)))
+            true                        (str "- [ ] " text)))))
+
+(bind "Mod-Shift-m" (ed-prompt "Meeting about?" new-meeting))
+
+(bind "Mod-Shift-a"
+  (ed-append "inbox.md" (str (as-task *line-text*) "\n") "## Inbox")
+  (ed-message "Sent to the inbox"))
+
+;; ══ Zero to Hero — chapter 10. Fetching prices ══════════════════════════════
+
+(on-load
+  (deftable prices (symbol:string kind:string price:number currency:string at:string source:string))
+  (def crypto-ids (list "bitcoin" "ethereum"))
+  (def fx-to (list "EUR" "BRL" "GBP"))
+
+  (defn fetch-json (url)
+    (let (r (http-get url))
+      (if (= (dict-get r :status) 200) (json-parse (dict-get r :body)) nil)))
+
+  (defn fetch-crypto ()
+    (let (data (fetch-json (str "https://api.coingecko.com/api/v3/simple/price?ids="
+                                (str-join "," crypto-ids) "&vs_currencies=usd")))
+      (if (nil? data) 0
+          (length (map (fn (id)
+                         (insert prices {:symbol id :kind "crypto" :currency "USD" :source "coingecko"
+                                         :price (dict-get (dict-get data id) :usd) :at *now*}))
+                       crypto-ids)))))
+
+  (defn fetch-fx ()
+    (let (data (fetch-json (str "https://api.frankfurter.app/latest?from=USD&to=" (str-join "," fx-to))))
+      (if (nil? data) 0
+          (length (map (fn (cur)
+                         (insert prices {:symbol (str "USD/" cur) :kind "fx" :currency cur :source "frankfurter"
+                                         :price (dict-get (dict-get data :rates) cur) :at *now*}))
+                       fx-to)))))
+
+  (defn latest (symbol)
+    (let (rows (records (query prices :where "symbol = ?" :params (list symbol)
+                                      :order "at" :desc true :limit 1)))
+      (if (empty? rows) nil (field-get (first rows) :price))))
+
+  ;; both sources; how many prices were saved
+  (defn refresh-prices () (+ (fetch-crypto) (fetch-fx))))
+
+;; ⌘⇧Q — fetch now, and say how it went
+(bind "Mod-Shift-q"
+  (let (n (refresh-prices))
+    (ed-message (if (= n 0) "No prices — the services said no; try again in a minute" (str n " prices saved")))))
+
+;; every 15 minutes while EEditor is open, quietly
+(on-tick
+  (when (= (mod (->number (second (str-split *time* ":"))) 15) 0)
+    (refresh-prices)
+    (ed-nothing)))
+
+(bind "Mod-Shift-y"
+  (ed-append (str *date* ".md")
+             (str "- " *time* "  BTC " (latest "bitcoin") " USD · EUR " (latest "USD/EUR") "\n")
+             "## Markets"))

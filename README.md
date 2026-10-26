@@ -18,7 +18,12 @@ One place for everything [EEditor](https://eeditor.app) and [EELisp](https://eel
   signature, what it does, an example and a link to its documentation. `#q=countif` in the address
   opens it searching. The same data is published as `catalog.json`.
 
-## Nothing here is written by hand
+- **Zero to Hero** — a book, written here in [`book/`](book/README.md): one PIM workspace grown
+  chapter by chapter, with an agenda, tables, forms, sheets and live market prices. Every chapter's
+  code runs against the real engine in CI (`test_book.py`), and the companion workspace is in
+  [`book/workspace/`](book/workspace/).
+
+## Nothing here is written by hand (except the book)
 
 `build.py` reads [eeditor-next](https://github.com/santacroce-tech/eeditor-next) and
 [eelisp-rs](https://github.com/santacroce-tech/eelisp-rs) and assembles the site:
@@ -57,6 +62,13 @@ python3 -m http.server -d _site  # then open http://localhost:8000
 ```
 
 Python 3.9 or later, standard library only.
+
+The book's tests need the engine binary (`cargo build --release --bin eelisp` in eelisp-rs):
+
+```bash
+python3 test_book.py              # every chapter, against ../eelisp-rs's binary
+python3 test_book.py --assemble   # first rewrite book/workspace's keybindings from the chapters
+```
 
 ## Licence
 

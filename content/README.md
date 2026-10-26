@@ -11,6 +11,16 @@ The folders mirror where each file lives — `eeditor/` is eeditor-next, `eelisp
 `sample-workspace/` is what EEditor writes into a new folder — so the links between them work.
 Below, the same files by topic.
 
+## Zero to Hero — the book
+
+One project grown chapter by chapter: a personal workspace with an agenda, tables, forms, sheets and live market prices. Every chapter's code is tested against the engine.
+
+- [Zero to Hero — contents](../book/README.md) — Book · `README.md`
+- [1. A folder that is your life](../book/01-a-folder-that-is-your-life.md) — Book · `01-a-folder-that-is-your-life.md`
+- [2. Your first shortcut](../book/02-your-first-shortcut.md) — Book · `02-your-first-shortcut.md`
+- [10. Fetching prices](../book/10-fetching-prices.md) — Book · `10-fetching-prices.md`
+- [The companion workspace's keybindings](../book/workspace/.eeditor/keybindings.eelisp) — Book · `workspace/.eeditor/keybindings.eelisp`
+
 ## Start here
 
 What EEditor and EELisp are, the welcome note a new folder gets, and the hands-on tutorial.
@@ -105,7 +115,7 @@ How the engine is built, using it from Rust, JSON or a browser, and the plan beh
 
 ## The project
 
-Releasing, the websites, themes, the ZX Spectrum, the app's native plugins, and the licences.
+The roadmap, releasing, the websites, themes, the ZX Spectrum, the app's native plugins, and the licences.
 
 - [Releasing EEditor](eeditor/docs/RELEASING.md) — EEditor · `docs/RELEASING.md`
 - [The eeditor.app website](eeditor/site/README.md) — EEditor · `site/README.md`

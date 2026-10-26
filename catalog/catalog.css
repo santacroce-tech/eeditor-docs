@@ -230,3 +230,6 @@ pre.source-file { font-size: .82rem; }
 @media (prefers-color-scheme: dark) { .origin.eelisp { color: #7fb3f0; } .origin.sample-workspace { color: #8fd19e; } }
 .topic-jump a b { font-weight: 500; color: var(--muted); margin-left: 2px; }
 .lib-group { scroll-margin-top: 72px; }
+.chapter-nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: .92rem; }
+.chapter-nav a { text-decoration: none; }
+.origin.book { color: var(--accent); }

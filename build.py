@@ -32,6 +32,7 @@ import importlib.util
 import os
 import posixpath
 import urllib.parse
+import zipfile
 from pathlib import Path
 
 import mdrender
@@ -335,6 +336,7 @@ def redirect(to: str, title: str) -> str:
 # ── the library: every Markdown file, and the EELisp the catalog points into ─
 
 GROUPS = [
+    ("book", "Zero to Hero", None),
     ("eeditor", "EEditor", "eeditor-next"),
     ("eelisp", "EELisp", "eelisp-rs"),
     ("sample-workspace", "Sample workspace", None),
@@ -350,6 +352,9 @@ SKIP = ("workspace/", "node_modules/")
 # pattern that matches its "group/path", in the order the patterns are listed — so a topic reads
 # from its introduction to its details. "Other" catches anything new, so nothing goes missing.
 TOPICS = [
+    ("book", "Zero to Hero — the book", "One project grown chapter by chapter: a personal workspace with an agenda, tables, forms, sheets and live market prices. Every chapter's code is tested against the engine.",
+     [("The companion workspace (zip)", "library/book/zero-to-hero-workspace.zip")],
+     [r"book/README\.md", r"book/\d\d-", r"book/workspace/"]),
     ("start", "Start here", "What EEditor and EELisp are, the welcome note a new folder gets, and the hands-on tutorial.",
      [("The tutorial — your first hour", "eeditor/tutorial.html"), ("The manual", "eeditor/manual.html")],
      [r"sample-workspace/welcome\.md", r"sample-workspace/TRY ME\.md", r"eeditor/README\.md", r"eelisp/README\.md",
@@ -376,9 +381,9 @@ TOPICS = [
     ("architecture", "Architecture and embedding", "How the engine is built, using it from Rust, JSON or a browser, and the plan behind the rebuild.",
      [("Embedding", "eelisp/embed.html")],
      [r"eelisp/docs/09-", r"eelisp/docs/10-", r"eelisp/web/", r"eeditor/docs/ANALYSIS\.md"]),
-    ("project", "The project", "Releasing, the websites, themes, the ZX Spectrum, the app's native plugins, and the licences.",
+    ("project", "The project", "The roadmap, releasing, the websites, themes, the ZX Spectrum, the app's native plugins, and the licences.",
      [("Download", "eeditor/download.html")],
-     [r"eeditor/docs/RELEASING\.md", r".*/site/README\.md", r"eeditor/docs/themes/", r"eeditor/docs/spectrum/",
+     [r"eeditor/docs/ROADMAP\.md", r"eeditor/docs/RELEASING\.md", r".*/site/README\.md", r"eeditor/docs/themes/", r"eeditor/docs/spectrum/",
       r"eeditor/src-tauri/", r".*/LICENSE$"]),
     ("other", "Other", "Documents not filed under a topic yet.", [], [r".*"]),
 ]
@@ -405,7 +410,7 @@ def by_topic(keys: list[str]) -> list[tuple[tuple, list[str]]]:
     return out
 
 
-ORIGIN = {"eeditor": "EEditor", "eelisp": "EELisp", "sample-workspace": "Sample"}
+ORIGIN = {"book": "Book", "eeditor": "EEditor", "eelisp": "EELisp", "sample-workspace": "Sample"}
 EEDITOR_CODE = ["src/sheets/functions.eelisp", "src/keybindings/default.eelisp", "src/keybindings/prelude.eelisp", "docs/pim/pim.eelisp"]
 
 
@@ -429,6 +434,12 @@ def gather(eeditor: Path, eelisp: Path, sample: Path | None) -> dict[str, Path]:
     for rel in tracked(eelisp, "*.md", "docs/assets/*", "LICENSE"):
         if not rel.startswith(SKIP):
             files[f"eelisp/{rel}"] = eelisp / rel
+    # The book is written here, not copied: its chapters, and the companion workspace's keybindings
+    for f in sorted((HERE / "book").glob("*.md")):
+        files[f"book/{f.name}"] = f
+    kb = HERE / "book" / "workspace" / ".eeditor" / "keybindings.eelisp"
+    if kb.exists():
+        files["book/workspace/.eeditor/keybindings.eelisp"] = kb
     # The sample workspace: freshly made (--sample), or the copy already kept in content/
     root = sample if sample else HERE / "content" / "sample-workspace"
     if root.exists():
@@ -441,7 +452,7 @@ def gather(eeditor: Path, eelisp: Path, sample: Path | None) -> dict[str, Path]:
 def sync_content(files: dict[str, Path], made: str) -> list[str]:
     """Keep content/ in this repository the same as the sources: written, updated, or removed."""
     content = HERE / "content"
-    wanted = {content / key: src for key, src in files.items()}
+    wanted = {content / key: src for key, src in files.items() if not key.startswith("book/")}
     changed = []
     for dest, src in wanted.items():
         data = src.read_bytes()
@@ -502,7 +513,8 @@ def content_readme(files: dict[str, Path], made: str) -> str:
         for k in keys:
             group, rel = k.split("/", 1)
             title = doc_title(files[k], rel, k)
-            lines.append(f"- [{title}]({urllib.parse.quote(k)}) — {ORIGIN[group]} · `{rel}`")
+            target = "../" + k if group == "book" else k  # the book lives beside content/, not in it
+            lines.append(f"- [{title}]({urllib.parse.quote(target)}) — {ORIGIN[group]} · `{rel}`")
         lines.append("")
     return "\n".join(lines)
 
@@ -521,6 +533,8 @@ def order_keys(keys: list[str]) -> list[str]:
 
 # Where a file's own title says too little once it sits among sixty others
 TITLES = {
+    "book/README.md": "Zero to Hero — contents",
+    "book/workspace/.eeditor/keybindings.eelisp": "The companion workspace's keybindings",
     "eeditor/README.md": "EEditor — README",
     "eelisp/README.md": "EELisp — README",
     "eelisp/docs/README.md": "The EELisp book — contents",
@@ -719,7 +733,7 @@ def page_html(title: str, page: str, body: str, nav: str, toc: list, source: str
     <article class="doc-body">
 {body}
     </article>
-    <p class="source">Source: <a href="{html.escape(source)}">{html.escape(source_label)}</a></p>
+    {f'<p class="source">Source: <a href="{html.escape(source)}">{html.escape(source_label)}</a></p>' if source else ""}
   </main>
   {toc_html}
 </div>
@@ -756,7 +770,9 @@ def build_library(files: dict[str, Path], out: Path, eelisp: Path) -> list[dict]
             title = doc_title(src, rel, key)
             first = [l[2:].strip() for l in text.splitlines()[:6] if l.startswith(";;") and l[2:].strip()]
             summary = " ".join(first[1:3] if len(first) > 1 else first)[:200]
-        label = f"content/{key}" + (f" · from {REPO_OF[group]}/{rel}" if REPO_OF[group] else "")
+        label = (f"book/{rel} in this repository" if group == "book"
+                 else f"content/{key}" + (f" · from {REPO_OF[group]}/{rel}" if REPO_OF[group] else ""))
+        body += chapter_nav(key, files, page)
         nav = nav_html(files, key, page)
         (out / page).write_text(page_html(title, page, body, nav, toc, rel_href(page, raw), label), encoding="utf-8")
         index.append({"key": key, "group": group, "title": title, "summary": summary, "href": page, "path": rel})
@@ -764,6 +780,18 @@ def build_library(files: dict[str, Path], out: Path, eelisp: Path) -> list[dict]
     for d in index:
         d["topic"] = topic_of(d["key"])[0]
     return index
+
+
+def chapter_nav(key: str, files: dict[str, Path], page: str) -> str:
+    """← previous · contents · next → under a chapter of the book."""
+    if not re.match(r"book/\d\d-", key):
+        return ""
+    chapters = sorted(k for k in files if re.match(r"book/\d\d-.*\.md$", k))
+    i = chapters.index(key)
+    link = lambda k, text: f'<a href="{html.escape(rel_href(page, site_path(k)))}">{text}</a>'
+    prev = link(chapters[i - 1], "← " + html.escape(doc_title(files[chapters[i - 1]], chapters[i - 1][5:], chapters[i - 1]))) if i > 0 else "<span></span>"
+    nxt = link(chapters[i + 1], html.escape(doc_title(files[chapters[i + 1]], chapters[i + 1][5:], chapters[i + 1])) + " →") if i + 1 < len(chapters) else "<span></span>"
+    return f'<nav class="chapter-nav">{prev}{link("book/README.md", "Contents")}{nxt}</nav>'
 
 
 def write_library_index(index: list[dict], files: dict[str, Path], out: Path) -> None:
@@ -798,7 +826,7 @@ def write_library_index(index: list[dict], files: dict[str, Path], out: Path) ->
         + "".join(sections)
     )
     nav = nav_html(files, "", page)
-    (out / page).write_text(page_html("The library", page, body, nav, [], rel_href(page, "library/"), "content/ in this repository"), encoding="utf-8")
+    (out / page).write_text(page_html("The library", page, body, nav, [], "", ""), encoding="utf-8")
 
 
 # ── the build ────────────────────────────────────────────────────────────────
@@ -856,6 +884,7 @@ def build(eeditor: Path, eelisp: Path, out: Path, regen: bool, sample: Path | No
     }
 
     library = build_library(files, out, eelisp)
+    zip_workspace(HERE / "book" / "workspace", out / "library" / "book" / "zero-to-hero-workspace.zip")
     synced = sync_content(files, sample_made(files)) if sync else []
 
     page = read(HERE / "catalog" / "index.html")
@@ -889,6 +918,17 @@ def build(eeditor: Path, eelisp: Path, out: Path, regen: bool, sample: Path | No
     (out / "catalog.json").write_text(json.dumps({"items": items, "meta": meta}, ensure_ascii=False, indent=1), encoding="utf-8")
     (out / ".nojekyll").write_text("")
     return {"items": len(items), "counts": counts, "meta": meta, "library": len(library), "synced": synced}
+
+
+def zip_workspace(src: Path, dest: Path) -> None:
+    """The companion workspace as one download, unpacking to a folder named Zero-to-Hero."""
+    if not src.exists():
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(src.rglob("*")):
+            if f.is_file() and f.name not in (".DS_Store",) and not f.name.startswith("eeditor.db"):
+                z.write(f, "Zero-to-Hero/" + f.relative_to(src).as_posix())
 
 
 def sample_made(files: dict[str, Path]) -> str:

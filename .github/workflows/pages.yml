@@ -26,7 +26,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The book's code, run on the real engine: a chapter that no longer works stops the deploy.
+  book:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: eeditor-docs
+      - uses: actions/checkout@v4
+        with:
+          repository: santacroce-tech/eeditor-next
+          path: eeditor-next
+      - uses: actions/checkout@v4
+        with:
+          repository: santacroce-tech/eelisp-rs
+          path: eelisp-rs
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: eelisp-rs
+      - name: Build the engine
+        working-directory: eelisp-rs
+        run: cargo build --release --bin eelisp
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run the book
+        run: python3 eeditor-docs/test_book.py --eeditor eeditor-next
+        env:
+          EELISP_BIN: ${{ github.workspace }}/eelisp-rs/target/release/eelisp
+
   build:
+    needs: book
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -103,7 +103,28 @@ def highlight_lisp(code: str, anchors: bool = False) -> str:
 # ── inline ───────────────────────────────────────────────────────────────────
 
 
+LINK = re.compile(r"(!?)\[((?:[^\]`]|`[^`]*`)+)\]\(([^)\s]+)\)")
+
+
 def inline(text: str, link: Link) -> str:
+    # Links and images first, as whole units, so a label may hold code: [`workspace/`](workspace/)
+    held: list[str] = []
+
+    def hold(m: re.Match) -> str:
+        bang, label, target = m.group(1), m.group(2), m.group(3)
+        href = html.escape(link(target))
+        if bang:
+            held.append(f'<img alt="{html.escape(label)}" src="{href}" loading="lazy">')
+        else:
+            held.append(f'<a href="{href}">{inline(label, link)}</a>')
+        return f"\x00{len(held) - 1}\x00"
+
+    text = LINK.sub(hold, text)
+    out_html = _inline(text, link)
+    return re.sub(r"\x00(\d+)\x00", lambda m: held[int(m.group(1))], out_html)
+
+
+def _inline(text: str, link: Link) -> str:
     parts = re.split(r"(`+[^`]+?`+)", text)
     out = []
     for p in parts:
@@ -111,11 +132,6 @@ def inline(text: str, link: Link) -> str:
             out.append("<code>" + html.escape(p.strip("`").strip(" ") if p.startswith("``") else p[1:-1]) + "</code>")
             continue
         p = html.escape(p, quote=False)
-        # images, then links, so ![a](b) isn't read as a link
-        p = re.sub(r"!\[([^\]]*)\]\(([^)\s]+)\)",
-                   lambda m: f'<img alt="{m.group(1)}" src="{html.escape(link(html.unescape(m.group(2))))}" loading="lazy">', p)
-        p = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)",
-                   lambda m: f'<a href="{html.escape(link(html.unescape(m.group(2))))}">{m.group(1)}</a>', p)
         p = re.sub(r"&lt;(https?://[^\s&]+)&gt;", lambda m: f'<a href="{m.group(1)}">{m.group(1)}</a>', p)
         p = re.sub(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]",
                    lambda m: f'<a class="wiki" href="{html.escape(link("[[" + m.group(1).strip() + "]]"))}">{m.group(2) or m.group(1)}</a>', p)
@@ -123,8 +139,13 @@ def inline(text: str, link: Link) -> str:
         p = re.sub(r"(?<![\w*])\*(?![\s*])(.+?)(?<![\s*])\*(?![\w*])", r"<em>\1</em>", p)
         p = re.sub(r"(?<![\w])_(?![\s_])(.+?)(?<![\s_])_(?![\w])", r"<em>\1</em>", p)
         p = re.sub(r"~~(.+?)~~", r"<del>\1</del>", p)
-        p = re.sub(r"(?<![\w&{/#])#([A-Za-z][\w/-]*)", r'<span class="tag">#\1</span>', p)
-        p = re.sub(r"\{#(\d+)\}", r'<span class="item-id">{#\1}</span>', p)
+        # tags and item ids, in the text only — never inside a tag's attributes (href="#section")
+        p = "".join(
+            seg if seg.startswith("<") else
+            re.sub(r"\{#(\d+)\}", r'<span class="item-id">{#\1}</span>',
+                   re.sub(r"(?<![\w&{/#])#([A-Za-z][\w/-]*)", r'<span class="tag">#\1</span>', seg))
+            for seg in re.split(r"(<[^>]+>)", p)
+        )
         out.append(p)
     return "".join(out)
 
@@ -141,6 +162,8 @@ def render_list(lines: list[str], link: Link) -> str:
         first = LIST_ITEM.match(lines[start])
         ordered = bool(first and first.group(2)[0].isdigit())
         tag = "ol" if ordered else "ul"
+        begin = int(re.match(r"\d+", first.group(2)).group(0)) if ordered else 1
+        open_tag = f'<ol start="{begin}">' if ordered and begin != 1 else f"<{tag}>"
         items: list[str] = []
         i = start
         while i < len(lines):
@@ -173,7 +196,7 @@ def render_list(lines: list[str], link: Link) -> str:
                 items.append(f"<li>{sub}</li>")
             else:
                 break
-        return f"<{tag}>" + "".join(items) + f"</{tag}>", i
+        return open_tag + "".join(items) + f"</{tag}>", i
 
     out, i = [], 0
     while i < len(lines):
