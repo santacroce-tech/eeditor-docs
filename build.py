@@ -343,7 +343,69 @@ GROUP_LABEL = {g: label for g, label, _ in GROUPS}
 REPO_OF = {g: repo for g, _, repo in GROUPS}
 TEXT = (".md", ".eelisp", ".eeform", "LICENSE")
 # Files the app writes for itself or that say nothing on their own
-SKIP = ("src-tauri/plugins/", "workspace/", "node_modules/")
+# workspace/ is what the sample workspace is made from; the library has the sample as the app writes it
+SKIP = ("workspace/", "node_modules/")
+
+# The library is read by topic, not by repository. Each file lands in the first topic with a
+# pattern that matches its "group/path", in the order the patterns are listed — so a topic reads
+# from its introduction to its details. "Other" catches anything new, so nothing goes missing.
+TOPICS = [
+    ("start", "Start here", "What EEditor and EELisp are, the welcome note a new folder gets, and the hands-on tutorial.",
+     [("The tutorial — your first hour", "eeditor/tutorial.html"), ("The manual", "eeditor/manual.html")],
+     [r"sample-workspace/welcome\.md", r"sample-workspace/TRY ME\.md", r"eeditor/README\.md", r"eelisp/README\.md",
+      r"eelisp/docs/README\.md", r"eelisp/docs/01-", r"sample-workspace/examples/.*\.mindmap\.md",
+      r"sample-workspace/todo\.md", r"sample-workspace/notes/"]),
+    ("language", "The EELisp language", "Syntax, the language, data, how it documents itself, and every function.",
+     [("The EELisp book", "eelisp/docs.html"), ("Search the catalog", "index.html#catalog")],
+     [r"eelisp/docs/02-", r"eelisp/docs/03-", r"eelisp/docs/04-", r"eelisp/docs/08-", r"eelisp/docs/reference\.md"]),
+    ("agenda", "Agenda and PIM", "Items, categories, rules and views; the PIM's notes kept in step with the agenda; and the sample's dashboard, inbox and daily note.",
+     [("Manual — the agenda", "eeditor/manual.html#agenda")],
+     [r"eeditor/docs/PIM\.md", r"eelisp/docs/06-", r"eeditor/docs/pim/", r"sample-workspace/dashboard\.md",
+      r"sample-workspace/\d{4}-\d\d-\d\d\.md", r"sample-workspace/inbox\.md", r"sample-workspace/bills\.md",
+      r"sample-workspace/projects/", r"sample-workspace/pim/"]),
+    ("spreadsheets", "Spreadsheets", "Sheets whose formulas are EELisp: the design, sheets from code, the spreadsheet functions (countif, vlookup…), and what is still missing.",
+     [("Manual — sheets", "eeditor/manual.html#sheets"), ("Spreadsheet functions in the catalog", "index.html#q=countif")],
+     [r"eeditor/docs/SPREADSHEET\.md", r"eelisp/docs/07-", r"eeditor/src/sheets/", r"eeditor/docs/SHEETS-LATER\.md"]),
+    ("forms", "Database and forms", "dBASE-style tables on SQLite, and forms you draw and run — with the example forms.",
+     [("Manual — forms", "eeditor/manual.html#forms"), ("The Office app", "eeditor/apps/Office.html")],
+     [r"eelisp/docs/05-", r"eeditor/docs/FORMS\.md", r"eeditor/docs/FORM-APPS\.md", r"sample-workspace/.*\.eeform"]),
+    ("keys", "Keybindings and snippets", "The shortcut table is EELisp: the defaults, the editor commands it can call, and the snippets bundle.",
+     [("Manual — keybindings", "eeditor/manual.html#keybindings")],
+     [r"eeditor/src/keybindings/default", r"eeditor/src/keybindings/", r"sample-workspace/\.eeditor/",
+      r"eeditor/src/snippets/README\.md", r"eeditor/src/snippets/"]),
+    ("architecture", "Architecture and embedding", "How the engine is built, using it from Rust, JSON or a browser, and the plan behind the rebuild.",
+     [("Embedding", "eelisp/embed.html")],
+     [r"eelisp/docs/09-", r"eelisp/docs/10-", r"eelisp/web/", r"eeditor/docs/ANALYSIS\.md"]),
+    ("project", "The project", "Releasing, the websites, themes, the ZX Spectrum, the app's native plugins, and the licences.",
+     [("Download", "eeditor/download.html")],
+     [r"eeditor/docs/RELEASING\.md", r".*/site/README\.md", r"eeditor/docs/themes/", r"eeditor/docs/spectrum/",
+      r"eeditor/src-tauri/", r".*/LICENSE$"]),
+    ("other", "Other", "Documents not filed under a topic yet.", [], [r".*"]),
+]
+TOPIC_LABEL = {t[0]: t[1] for t in TOPICS}
+
+
+def topic_of(key: str) -> tuple[str, int]:
+    """The topic a file belongs to, and where it comes within it."""
+    for slug, _, _, _, patterns in TOPICS:
+        for n, pat in enumerate(patterns):
+            if re.match(pat, key):
+                return slug, n
+    return "other", 0
+
+
+def by_topic(keys: list[str]) -> list[tuple[tuple, list[str]]]:
+    """Topics in order, each with its files in reading order; empty topics left out."""
+    out = []
+    for t in TOPICS:
+        mine = [k for k in keys if topic_of(k)[0] == t[0]]
+        mine.sort(key=lambda k: (topic_of(k)[1], k.lower()))
+        if mine:
+            out.append((t, mine))
+    return out
+
+
+ORIGIN = {"eeditor": "EEditor", "eelisp": "EELisp", "sample-workspace": "Sample"}
 EEDITOR_CODE = ["src/sheets/functions.eelisp", "src/keybindings/default.eelisp", "src/keybindings/prelude.eelisp", "docs/pim/pim.eelisp"]
 
 
@@ -429,17 +491,18 @@ def content_readme(files: dict[str, Path], made: str) -> str:
         "Don't edit them here: change them where they come from, and the next build brings the change.",
         "",
     ]
-    for g, label, repo in GROUPS:
-        keys = sorted(k for k in files if k.startswith(g + "/") and k.endswith(TEXT))
-        if not keys:
-            continue
-        lines += [f"## {label}", ""]
-        if repo:
-            lines += [f"From [{repo}](https://github.com/santacroce-tech/{repo}).", ""]
-        for k in order_keys(keys):
-            rel = k[len(g) + 1:]
-            title = doc_title(files[k], rel)
-            lines.append(f"- [{title}]({urllib.parse.quote(k)}) — `{rel}`")
+    lines += [
+        "The folders mirror where each file lives — `eeditor/` is eeditor-next, `eelisp/` is eelisp-rs,",
+        "`sample-workspace/` is what EEditor writes into a new folder — so the links between them work.",
+        "Below, the same files by topic.",
+        "",
+    ]
+    for (slug, label, blurb, _, _), keys in by_topic([k for k in files if k.endswith(TEXT)]):
+        lines += [f"## {label}", "", blurb, ""]
+        for k in keys:
+            group, rel = k.split("/", 1)
+            title = doc_title(files[k], rel, k)
+            lines.append(f"- [{title}]({urllib.parse.quote(k)}) — {ORIGIN[group]} · `{rel}`")
         lines.append("")
     return "\n".join(lines)
 
@@ -456,13 +519,58 @@ def order_keys(keys: list[str]) -> list[str]:
     return sorted(keys, key=rank)
 
 
-def doc_title(src: Path, rel: str) -> str:
+# Where a file's own title says too little once it sits among sixty others
+TITLES = {
+    "eeditor/README.md": "EEditor — README",
+    "eelisp/README.md": "EELisp — README",
+    "eelisp/docs/README.md": "The EELisp book — contents",
+    "sample-workspace/TRY ME.md": "TRY ME — the PIM tutorial",
+    "sample-workspace/examples/EEditor.mindmap.md": "Every shortcut — a mind map",
+    "sample-workspace/.eeditor/keybindings.eelisp": "The sample's keybindings, with the PIM",
+    "eeditor/src/keybindings/default.eelisp": "The default keybindings",
+    "eeditor/src/keybindings/prelude.eelisp": "The editor prelude — ed-* commands",
+    "eeditor/src-tauri/plugins/README.md": "The app's native plugins",
+    "eeditor/src-tauri/plugins/ios/README.md": "The iOS files plugin",
+    "eeditor/src-tauri/plugins/permissions/autogenerated/reference.md": "iOS files plugin — permissions (generated)",
+    "eeditor/site/README.md": "The eeditor.app website",
+    "eelisp/site/README.md": "The eelisp.app website",
+    "eeditor/docs/pim/pim.eelisp": "The PIM library — pim.eelisp",
+    "eeditor/src/snippets/README.md": "The snippets bundle (zzeelisp)",
+}
+
+
+def code_title(text: str, name: str) -> str:
+    """What an EELisp file's opening comment says it is: ";; zz-math.eelisp / ;; Math and number
+    utilities — ported from …" → "Math and number utilities"."""
+    lines = [re.sub(r"^;+\s*|[═─]+", "", l).strip() for l in text.splitlines()[:4] if l.startswith(";;")]
+    lines = [l for l in lines if l]
+    for l in lines:
+        l = re.sub(r"^" + re.escape(name) + r"\s*(—\s*)?", "", l).strip()
+        if l:
+            l = re.split(r" — |\. ", l)[0].strip().rstrip(".")
+            return l[:1].upper() + l[1:]
+    return name
+
+
+def doc_title(src: Path, rel: str, key: str = "") -> str:
+    if key in TITLES:
+        return TITLES[key]
+    name = rel.rsplit("/", 1)[-1]
     if rel.endswith(".md"):
         title, _ = mdrender.title_and_summary(read(src), rel)
+        title = re.sub(r"\s+#[A-Za-z][\w/-]*", "", title).strip()  # a note's tags aren't its name
+        if re.fullmatch(r"\d{4}-\d\d-\d\d\.md", name):
+            return f"Daily note — {title}"
+        if key.startswith("sample-workspace/projects/"):
+            return f"Project note — {title}"
         return title
-    if rel == "LICENSE":
-        return "Licence"
-    return rel.rsplit("/", 1)[-1]
+    if name == "LICENSE":
+        return f"Licence — {REPO_OF[key.split('/', 1)[0]] or 'sample'}"
+    stem = name.rsplit(".", 1)[0]
+    what = code_title(read(src), name)
+    if name.endswith(".eeform"):
+        return f"{stem} form" + (f" — {what}" if what != name and len(what) < 70 else "")
+    return what if what != name else name
 
 
 def site_path(key: str) -> str:
@@ -562,17 +670,18 @@ def load_diagram(eelisp: Path):
 
 def nav_html(files: dict[str, Path], current: str, page: str) -> str:
     out = []
-    for g, label, _ in GROUPS:
-        keys = order_keys([k for k in files if k.startswith(g + "/") and k.endswith(TEXT)])
-        if not keys:
-            continue
-        open_attr = " open" if current.startswith(g + "/") else ""
+    here = topic_of(current)[0] if current else ""
+    for (slug, label, _, _, _), keys in by_topic([k for k in files if k.endswith(TEXT)]):
+        open_attr = " open" if slug == here else ""
         items = []
         for k in keys:
-            rel = k[len(g) + 1:]
-            name = doc_title(files[k], rel)
+            group, rel = k.split("/", 1)
+            name = doc_title(files[k], rel, k)
             cls = ' class="here" aria-current="page"' if k == current else ""
-            items.append(f'<li><a{cls} href="{html.escape(rel_href(page, site_path(k)))}" title="{html.escape(rel)}">{html.escape(name)}</a></li>')
+            items.append(
+                f'<li><a{cls} href="{html.escape(rel_href(page, site_path(k)))}" title="{html.escape(ORIGIN[group] + " · " + rel)}">'
+                f'{html.escape(name)}<span class="origin {group}">{ORIGIN[group]}</span></a></li>'
+            )
         out.append(f'<details{open_attr}><summary>{label} <span>{len(keys)}</span></summary><ul>{"".join(items)}</ul></details>')
     return "".join(out)
 
@@ -635,15 +744,16 @@ def build_library(files: dict[str, Path], out: Path, eelisp: Path) -> list[dict]
         text = read(src)
         if key.endswith(".md"):
             body, toc = mdrender.render(text, linker.for_page(key), diagram)
-            title, summary = mdrender.title_and_summary(text, rel)
+            _, summary = mdrender.title_and_summary(text, rel)
+            title = doc_title(src, rel, key)
         elif key.endswith("LICENSE"):
             body = f'<h1 id="top">Licence — {html.escape(REPO_OF[group] or group)}</h1><pre class="text">{html.escape(text)}</pre>'
-            toc, title = [], f"Licence ({REPO_OF[group]})"
+            toc, title = [], doc_title(src, rel, key)
             summary = text.strip().splitlines()[0]
         else:
             body = f'<h1 id="top">{html.escape(rel.rsplit("/", 1)[-1])}</h1><pre class="lisp source-file"><code>{mdrender.highlight_lisp(text, anchors=True)}</code></pre>'
             toc = []
-            title = rel.rsplit("/", 1)[-1]
+            title = doc_title(src, rel, key)
             first = [l[2:].strip() for l in text.splitlines()[:6] if l.startswith(";;") and l[2:].strip()]
             summary = " ".join(first[1:3] if len(first) > 1 else first)[:200]
         label = f"content/{key}" + (f" · from {REPO_OF[group]}/{rel}" if REPO_OF[group] else "")
@@ -651,31 +761,40 @@ def build_library(files: dict[str, Path], out: Path, eelisp: Path) -> list[dict]
         (out / page).write_text(page_html(title, page, body, nav, toc, rel_href(page, raw), label), encoding="utf-8")
         index.append({"key": key, "group": group, "title": title, "summary": summary, "href": page, "path": rel})
     write_library_index(index, files, out)
+    for d in index:
+        d["topic"] = topic_of(d["key"])[0]
     return index
 
 
 def write_library_index(index: list[dict], files: dict[str, Path], out: Path) -> None:
     page = "library/index.html"
     sections = []
+    jump = []
     by_key = {d["key"]: d for d in index}
-    for g, label, repo in GROUPS:
-        keys = order_keys([k for k in by_key if k.startswith(g + "/")])
-        if not keys:
-            continue
+    for (slug, label, blurb, related, _), keys in by_topic(list(by_key)):
         cards = "".join(
             f'<article class="doc"><h3><a href="{html.escape(rel_href(page, by_key[k]["href"]))}">{html.escape(by_key[k]["title"])}</a></h3>'
-            f'<p class="path"><code>{html.escape(by_key[k]["path"])}</code></p>'
+            f'<p class="doc-path"><span class="origin {by_key[k]["group"]}">{ORIGIN[by_key[k]["group"]]}</span> <code>{html.escape(by_key[k]["path"])}</code></p>'
             + (f"<p>{html.escape(by_key[k]['summary'])}</p>" if by_key[k]["summary"] else "")
             + "</article>"
             for k in keys
         )
-        where = f" — from {repo}" if repo else " — what EEditor puts in a new folder"
-        sections.append(f'<section class="lib-group" id="{g}"><h2>{label}<span class="where">{html.escape(where)}</span></h2><div class="doc-grid">{cards}</div></section>')
+        also = ""
+        if related:
+            also = '<p class="related">Also: ' + " · ".join(
+                f'<a href="{html.escape(rel_href(page, href))}">{html.escape(text)}</a>' for text, href in related
+            ) + "</p>"
+        sections.append(
+            f'<section class="lib-group" id="{slug}"><h2>{html.escape(label)} <span class="where">{len(keys)}</span></h2>'
+            f'<p class="blurb">{html.escape(blurb)}</p>{also}<div class="doc-grid">{cards}</div></section>'
+        )
+        jump.append(f'<a href="#{slug}">{html.escape(label)}</a>')
     body = (
         '<h1 id="top">The library</h1>'
         "<p class=\"lede\">Every Markdown document of both projects, the sample workspace EEditor offers a new folder — "
         "the welcome note and the <b>TRY ME</b> tutorial among them — and the EELisp sources the catalog points into. "
         "Each page links to the others, and to the file it was made from.</p>"
+        + '<nav class="topic-jump" aria-label="Topics">' + "".join(jump) + "</nav>"
         + "".join(sections)
     )
     nav = nav_html(files, "", page)
@@ -754,6 +873,10 @@ def build(eeditor: Path, eelisp: Path, out: Path, regen: bool, sample: Path | No
         "{{EELISP_SHA}}": html.escape(meta["eelisp"]["sha"]),
         "{{TOTAL}}": str(len(items)),
         "{{LIBRARY_COUNT}}": str(len(library)),
+        "{{TOPICS}}": "".join(
+            f'<a href="library/index.html#{t[0]}">{html.escape(t[1])} <b>{sum(1 for d in library if d["topic"] == t[0])}</b></a>'
+            for t in TOPICS if any(d["topic"] == t[0] for d in library)
+        ),
         "{{PIM_TUTORIAL}}": site_path("sample-workspace/TRY ME.md") if "sample-workspace/TRY ME.md" in files else site_path("eeditor/docs/PIM.md"),
         "{{PIM_GUIDE}}": site_path("eeditor/docs/PIM.md"),
         "{{WELCOME}}": site_path("sample-workspace/welcome.md"),
