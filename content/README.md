@@ -117,6 +117,7 @@ How the engine is built, using it from Rust, JSON or a browser, and the plan beh
 
 The roadmap, releasing, the websites, themes, the ZX Spectrum, the app's native plugins, and the licences.
 
+- [Roadmap](eeditor/docs/ROADMAP.md) — EEditor · `docs/ROADMAP.md`
 - [Releasing EEditor](eeditor/docs/RELEASING.md) — EEditor · `docs/RELEASING.md`
 - [The eeditor.app website](eeditor/site/README.md) — EEditor · `site/README.md`
 - [The eelisp.app website](eelisp/site/README.md) — EELisp · `site/README.md`
