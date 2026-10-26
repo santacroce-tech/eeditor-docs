@@ -18,7 +18,20 @@ One project grown chapter by chapter: a personal workspace with an agenda, table
 - [Zero to Hero — contents](../book/README.md) — Book · `README.md`
 - [1. A folder that is your life](../book/01-a-folder-that-is-your-life.md) — Book · `01-a-folder-that-is-your-life.md`
 - [2. Your first shortcut](../book/02-your-first-shortcut.md) — Book · `02-your-first-shortcut.md`
+- [3. The agenda](../book/03-the-agenda.md) — Book · `03-the-agenda.md`
+- [4. Rules that file for you](../book/04-rules-that-file-for-you.md) — Book · `04-rules-that-file-for-you.md`
+- [5. Notes kept in step](../book/05-notes-kept-in-step.md) — Book · `05-notes-kept-in-step.md`
+- [6. A dashboard](../book/06-a-dashboard.md) — Book · `06-a-dashboard.md`
+- [7. Tables](../book/07-tables.md) — Book · `07-tables.md`
+- [8. Forms](../book/08-forms.md) — Book · `08-forms.md`
+- [9. Sheets](../book/09-sheets.md) — Book · `09-sheets.md`
 - [10. Fetching prices](../book/10-fetching-prices.md) — Book · `10-fetching-prices.md`
+- [11. Keeping them fresh](../book/11-keeping-them-fresh.md) — Book · `11-keeping-them-fresh.md`
+- [12. A portfolio sheet](../book/12-a-portfolio-sheet.md) — Book · `12-a-portfolio-sheet.md`
+- [13. Alerts as agenda items](../book/13-alerts-as-agenda-items.md) — Book · `13-alerts-as-agenda-items.md`
+- [14. The markets desk](../book/14-the-markets-desk.md) — Book · `14-the-markets-desk.md`
+- [15. The weekly review](../book/15-the-weekly-review.md) — Book · `15-the-weekly-review.md`
+- [16. Sharing and backup](../book/16-sharing-and-backup.md) — Book · `16-sharing-and-backup.md`
 - [The companion workspace's keybindings](../book/workspace/.eeditor/keybindings.eelisp) — Book · `workspace/.eeditor/keybindings.eelisp`
 
 ## Start here
@@ -51,6 +64,7 @@ Items, categories, rules and views; the PIM's notes kept in step with the agenda
 
 - [EEditor as a PIM — org-mode habits, in EELisp](eeditor/docs/PIM.md) — EEditor · `docs/PIM.md`
 - [6. The agenda](eelisp/docs/06-agenda.md) — EELisp · `docs/06-agenda.md`
+- [Capture form — Org-capture for EEditor](eeditor/docs/pim/Capture.eeform) — EEditor · `docs/pim/Capture.eeform`
 - [The PIM library — pim.eelisp](eeditor/docs/pim/pim.eelisp) — EEditor · `docs/pim/pim.eelisp`
 - [Dashboard](sample-workspace/dashboard.md) — Sample · `dashboard.md`
 - [Daily note — 2026-10-26 · Monday](sample-workspace/2026-10-26.md) — Sample · `2026-10-26.md`
