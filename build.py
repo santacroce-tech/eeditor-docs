@@ -28,7 +28,13 @@ import re
 import shutil
 import subprocess
 import sys
+import importlib.util
+import os
+import posixpath
+import urllib.parse
 from pathlib import Path
+
+import mdrender
 
 HERE = Path(__file__).resolve().parent
 GITHUB = "https://github.com/santacroce-tech"
@@ -213,7 +219,7 @@ def snippet_functions(snippets: Path) -> list[dict]:
                 "sig": sig,
                 "summary": inline_md(title + (". " + " ".join(notes) if notes else "")),
                 "example": "\n".join(examples),
-                "href": f"{GITHUB}/eeditor-next/blob/main/src/snippets/{f.name}",
+                "href": site_path(f"eeditor/src/snippets/{f.name}") + f"#fn-{name}",
             })
     return entries
 
@@ -301,13 +307,19 @@ CROSS_LINKS = {
 }
 
 
-def copy_site(src: Path, dest: Path) -> None:
+def copy_site(src: Path, dest: Path, linker: "Linker") -> None:
     shutil.copytree(src, dest, ignore=shutil.ignore_patterns("README.md", ".DS_Store"))
     for page in dest.glob("*.html"):  # the site's own pages; apps/ are exported forms, left alone
         text = read(page)
         text = text.replace('href="/"', 'href="index.html"')
         for old, new in CROSS_LINKS.items():
             text = text.replace(f'href="{old}"', f'href="{new}"')
+
+        def local(m: re.Match) -> str:
+            inside = linker.internal(html.unescape(m.group(1)))
+            return f'href="../{inside}"' if inside else m.group(0)
+
+        text = re.sub(r'href="(https?://[^"]+)"', local, text)
         text = re.sub(r"(<body[^>]*>)", lambda m: m.group(1) + BACK_LINK, text, count=1)
         page.write_text(text, encoding="utf-8")
 
@@ -320,10 +332,360 @@ def redirect(to: str, title: str) -> str:
 """
 
 
+# ── the library: every Markdown file, and the EELisp the catalog points into ─
+
+GROUPS = [
+    ("eeditor", "EEditor", "eeditor-next"),
+    ("eelisp", "EELisp", "eelisp-rs"),
+    ("sample-workspace", "Sample workspace", None),
+]
+GROUP_LABEL = {g: label for g, label, _ in GROUPS}
+REPO_OF = {g: repo for g, _, repo in GROUPS}
+TEXT = (".md", ".eelisp", ".eeform", "LICENSE")
+# Files the app writes for itself or that say nothing on their own
+SKIP = ("src-tauri/plugins/", "workspace/", "node_modules/")
+EEDITOR_CODE = ["src/sheets/functions.eelisp", "src/keybindings/default.eelisp", "src/keybindings/prelude.eelisp", "docs/pim/pim.eelisp"]
+
+
+def tracked(repo: Path, *patterns: str) -> list[str]:
+    try:
+        out = subprocess.run(["git", "-C", str(repo), "ls-files", *patterns], capture_output=True, text=True, check=True).stdout
+        return [f for f in out.splitlines() if f]
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return [str(p.relative_to(repo)) for pat in patterns for p in repo.glob("**/" + pat)]
+
+
+def gather(eeditor: Path, eelisp: Path, sample: Path | None) -> dict[str, Path]:
+    """"group/path" → the file it comes from."""
+    files: dict[str, Path] = {}
+    for rel in tracked(eeditor, "*.md"):
+        if not rel.startswith(SKIP):
+            files[f"eeditor/{rel}"] = eeditor / rel
+    for rel in ["LICENSE"] + EEDITOR_CODE + sorted(str(p.relative_to(eeditor)) for p in (eeditor / "src" / "snippets").glob("zz-*.eelisp")):
+        if (eeditor / rel).exists():
+            files[f"eeditor/{rel}"] = eeditor / rel
+    for rel in tracked(eelisp, "*.md", "docs/assets/*", "LICENSE"):
+        if not rel.startswith(SKIP):
+            files[f"eelisp/{rel}"] = eelisp / rel
+    # The sample workspace: freshly made (--sample), or the copy already kept in content/
+    root = sample if sample else HERE / "content" / "sample-workspace"
+    if root.exists():
+        for f in sorted(root.rglob("*")):
+            if f.is_file() and f.suffix in TEXT and f.name != "README.md":
+                files[f"sample-workspace/{f.relative_to(root).as_posix()}"] = f
+    return files
+
+
+def sync_content(files: dict[str, Path], made: str) -> list[str]:
+    """Keep content/ in this repository the same as the sources: written, updated, or removed."""
+    content = HERE / "content"
+    wanted = {content / key: src for key, src in files.items()}
+    changed = []
+    for dest, src in wanted.items():
+        data = src.read_bytes()
+        if not dest.exists() or dest.read_bytes() != data:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(data)
+            changed.append(str(dest.relative_to(HERE)))
+    if content.exists():
+        for f in sorted(content.rglob("*")):
+            if f.is_file() and f not in wanted and f.name != "README.md":
+                f.unlink()
+                changed.append(f"- {f.relative_to(HERE)}")
+    readme = content_readme(files, made)
+    target = content / "README.md"
+    if not target.exists() or read(target) != readme:
+        target.write_text(readme, encoding="utf-8")
+        changed.append("content/README.md")
+    sample_readme = content / "sample-workspace" / "README.md"
+    if sample_readme.parent.exists():
+        text = SAMPLE_README.format(made=made)
+        if not sample_readme.exists():
+            sample_readme.write_text(text, encoding="utf-8")
+            changed.append(str(sample_readme.relative_to(HERE)))
+    return changed
+
+
+SAMPLE_README = """# The sample workspace
+
+What EEditor puts in an empty folder when you accept its samples: the welcome note, the PIM
+tutorial (**TRY ME.md**) with an agenda and notes linked to it, the example forms, a mind map of
+every shortcut, and the keybindings the PIM uses (`.eeditor/keybindings.eelisp`).
+
+This copy was made on {made} with `npm run pim:sample` in eeditor-next. In the app the dates are
+relative to the day you add the samples, so they will differ from the ones here.
+"""
+
+
+def content_readme(files: dict[str, Path], made: str) -> str:
+    lines = [
+        "# The library",
+        "",
+        "Every Markdown document of EEditor and EELisp, the sample workspace the app offers a new",
+        "folder, and the EELisp sources the catalog points into — copied here by `build.py`, kept in",
+        "step with the two repositories. They read as they are on GitHub; the catalog site shows them",
+        "formatted, linked to each other: https://santacroce-tech.github.io/eeditor-docs/library/",
+        "",
+        "Don't edit them here: change them where they come from, and the next build brings the change.",
+        "",
+    ]
+    for g, label, repo in GROUPS:
+        keys = sorted(k for k in files if k.startswith(g + "/") and k.endswith(TEXT))
+        if not keys:
+            continue
+        lines += [f"## {label}", ""]
+        if repo:
+            lines += [f"From [{repo}](https://github.com/santacroce-tech/{repo}).", ""]
+        for k in order_keys(keys):
+            rel = k[len(g) + 1:]
+            title = doc_title(files[k], rel)
+            lines.append(f"- [{title}]({urllib.parse.quote(k)}) — `{rel}`")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def order_keys(keys: list[str]) -> list[str]:
+    """READMEs, the welcome note and the tutorial first, then by path."""
+    first = ("README.md", "welcome.md", "TRY ME.md")
+
+    def rank(k: str) -> tuple:
+        name = k.rsplit("/", 1)[-1]
+        depth = k.count("/")
+        return (0 if name in first and depth <= 1 else 1, first.index(name) if name in first else 9, k.endswith(".md") is False, k.lower())
+
+    return sorted(keys, key=rank)
+
+
+def doc_title(src: Path, rel: str) -> str:
+    if rel.endswith(".md"):
+        title, _ = mdrender.title_and_summary(read(src), rel)
+        return title
+    if rel == "LICENSE":
+        return "Licence"
+    return rel.rsplit("/", 1)[-1]
+
+
+def site_path(key: str) -> str:
+    """Where a library file is published: no dotted folders (GitHub Pages hides them), no spaces."""
+    parts = [re.sub(r"^\.", "_", p).replace(" ", "-") for p in key.split("/")]
+    path = "library/" + "/".join(parts)
+    if path.endswith(".md"):
+        return path[:-3] + ".html"
+    if path.endswith((".eelisp", ".eeform", "/LICENSE")):
+        return path + ".html"
+    return path  # an image or other asset, as it is
+
+
+def raw_path(key: str) -> str:
+    """The file itself, published next to its page so "view the source" stays on this site."""
+    parts = [re.sub(r"^\.", "_", p).replace(" ", "-") for p in key.split("/")]
+    return "library/" + "/".join(parts)
+
+
+def rel_href(from_page: str, to: str) -> str:
+    return posixpath.relpath(to, posixpath.dirname(from_page) or ".")
+
+
+class Linker:
+    """Where a link in a library page should point: another page of this site whenever the target
+    is one — a document, an image, one of the two project sites — and outside only when it has to."""
+
+    def __init__(self, files: dict[str, Path]) -> None:
+        self.files = files
+        self.by_name: dict[tuple[str, str], str] = {}
+        for k in files:
+            g = k.split("/", 1)[0]
+            name = k.rsplit("/", 1)[-1]
+            if name.endswith(".md"):
+                self.by_name.setdefault((g, name[:-3].lower()), k)
+
+    def internal(self, url: str) -> str | None:
+        """A site-root path for an absolute URL that this site has a copy of."""
+        u = urllib.parse.urlsplit(url)
+        host, path, frag = u.netloc.lower(), u.path, ("#" + u.fragment if u.fragment else "")
+        for domain, folder in (("eeditor.app", "eeditor"), ("eelisp.app", "eelisp")):
+            if host in (domain, "www." + domain):
+                page = path.strip("/") or "index.html"
+                if folder == "eelisp" and page == "reference.html":
+                    return "eelisp/docs.html#reference"
+                return f"{folder}/{page}{frag}"
+        m = re.match(r"^/santacroce-tech/(eeditor-next|eelisp-rs)/(?:blob|tree)/[^/]+/(.+)$", path) if host == "github.com" else None
+        if m:
+            group = "eeditor" if m.group(1) == "eeditor-next" else "eelisp"
+            key = f"{group}/{m.group(2)}"
+            if key in self.files:
+                return site_path(key) + frag
+        return None
+
+    def for_page(self, key: str):
+        page = site_path(key)
+        group = key.split("/", 1)[0]
+        repo = REPO_OF[group]
+
+        def link(target: str) -> str:
+            if target.startswith("[["):
+                name = target[2:-2].strip().lower().removesuffix(".md")
+                hit = self.by_name.get((group, name)) or self.by_name.get((group, name.rsplit("/", 1)[-1]))
+                return rel_href(page, site_path(hit)) if hit else "#"
+            if re.match(r"^[a-z]+:", target):
+                inside = self.internal(target) if target.startswith("http") else None
+                return rel_href(page, inside) if inside else target
+            if target.startswith("#"):
+                return target
+            path, _, frag = target.partition("#")
+            here = posixpath.dirname(key)
+            resolved = posixpath.normpath(posixpath.join(here, urllib.parse.unquote(path)))
+            frag = "#" + frag if frag else ""
+            if resolved in self.files:
+                return rel_href(page, site_path(resolved)) + frag
+            if repo and resolved.startswith(group + "/"):
+                # source code and other files the library doesn't hold: the repository has them
+                return f"{GITHUB}/{repo}/blob/main/{resolved[len(group) + 1:]}{frag}"
+            return target
+
+        return link
+
+
+def load_diagram(eelisp: Path):
+    """The EELisp book's Mermaid sequence-diagram → SVG drawer, so diagrams need no script."""
+    script = eelisp / "scripts" / "build-docs.py"
+    if not script.exists():
+        return None
+    spec = importlib.util.spec_from_file_location("eelisp_build_docs", script)
+    mod = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(mod)
+        return getattr(mod, "sequence_svg", None)
+    except Exception:
+        return None
+
+
+def nav_html(files: dict[str, Path], current: str, page: str) -> str:
+    out = []
+    for g, label, _ in GROUPS:
+        keys = order_keys([k for k in files if k.startswith(g + "/") and k.endswith(TEXT)])
+        if not keys:
+            continue
+        open_attr = " open" if current.startswith(g + "/") else ""
+        items = []
+        for k in keys:
+            rel = k[len(g) + 1:]
+            name = doc_title(files[k], rel)
+            cls = ' class="here" aria-current="page"' if k == current else ""
+            items.append(f'<li><a{cls} href="{html.escape(rel_href(page, site_path(k)))}" title="{html.escape(rel)}">{html.escape(name)}</a></li>')
+        out.append(f'<details{open_attr}><summary>{label} <span>{len(keys)}</span></summary><ul>{"".join(items)}</ul></details>')
+    return "".join(out)
+
+
+def page_html(title: str, page: str, body: str, nav: str, toc: list, source: str, source_label: str) -> str:
+    root = "../" * page.count("/")
+    toc_html = ""
+    if len(toc) > 1:
+        toc_html = '<aside class="toc"><b>On this page</b><ul>' + "".join(
+            f'<li class="l{lvl}"><a href="#{hid}">{text}</a></li>' for lvl, hid, text in toc
+        ) + "</ul></aside>"
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{html.escape(title)} — EEditor &amp; EELisp library</title>
+<link rel="icon" href="{root}favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="{root}catalog.css">
+</head>
+<body class="lib">
+<header class="top">
+  <div class="wrap wide top-row">
+    <a class="brand" href="{root}index.html"><span class="logo" aria-hidden="true">λ</span><span class="brand-text">EEditor &amp; EELisp</span></a>
+    <nav>
+      <a href="{root}index.html#start">Start</a>
+      <a href="{root}library/index.html">Library</a>
+      <a href="{root}index.html#catalog">Catalog</a>
+    </nav>
+  </div>
+</header>
+<div class="wrap wide lib-grid">
+  <nav class="lib-nav" aria-label="Library"><a class="lib-home" href="{root}library/index.html">All documents</a>{nav}</nav>
+  <main class="lib-main">
+    <article class="doc-body">
+{body}
+    </article>
+    <p class="source">Source: <a href="{html.escape(source)}">{html.escape(source_label)}</a></p>
+  </main>
+  {toc_html}
+</div>
+<footer><div class="wrap wide">EEditor and EELisp are free software under the MIT licence, developed by Roberto Santacroce Martins. © 2026</div></footer>
+</body>
+</html>
+"""
+
+
+def build_library(files: dict[str, Path], out: Path, eelisp: Path) -> list[dict]:
+    linker = Linker(files)
+    diagram = load_diagram(eelisp)
+    index: list[dict] = []
+    for key, src in files.items():
+        page = site_path(key)
+        raw = raw_path(key)
+        (out / raw).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, out / raw)  # the file itself, for "source"
+        if not key.endswith(TEXT):
+            continue
+        group, rel = key.split("/", 1)
+        text = read(src)
+        if key.endswith(".md"):
+            body, toc = mdrender.render(text, linker.for_page(key), diagram)
+            title, summary = mdrender.title_and_summary(text, rel)
+        elif key.endswith("LICENSE"):
+            body = f'<h1 id="top">Licence — {html.escape(REPO_OF[group] or group)}</h1><pre class="text">{html.escape(text)}</pre>'
+            toc, title = [], f"Licence ({REPO_OF[group]})"
+            summary = text.strip().splitlines()[0]
+        else:
+            body = f'<h1 id="top">{html.escape(rel.rsplit("/", 1)[-1])}</h1><pre class="lisp source-file"><code>{mdrender.highlight_lisp(text, anchors=True)}</code></pre>'
+            toc = []
+            title = rel.rsplit("/", 1)[-1]
+            first = [l[2:].strip() for l in text.splitlines()[:6] if l.startswith(";;") and l[2:].strip()]
+            summary = " ".join(first[1:3] if len(first) > 1 else first)[:200]
+        label = f"content/{key}" + (f" · from {REPO_OF[group]}/{rel}" if REPO_OF[group] else "")
+        nav = nav_html(files, key, page)
+        (out / page).write_text(page_html(title, page, body, nav, toc, rel_href(page, raw), label), encoding="utf-8")
+        index.append({"key": key, "group": group, "title": title, "summary": summary, "href": page, "path": rel})
+    write_library_index(index, files, out)
+    return index
+
+
+def write_library_index(index: list[dict], files: dict[str, Path], out: Path) -> None:
+    page = "library/index.html"
+    sections = []
+    by_key = {d["key"]: d for d in index}
+    for g, label, repo in GROUPS:
+        keys = order_keys([k for k in by_key if k.startswith(g + "/")])
+        if not keys:
+            continue
+        cards = "".join(
+            f'<article class="doc"><h3><a href="{html.escape(rel_href(page, by_key[k]["href"]))}">{html.escape(by_key[k]["title"])}</a></h3>'
+            f'<p class="path"><code>{html.escape(by_key[k]["path"])}</code></p>'
+            + (f"<p>{html.escape(by_key[k]['summary'])}</p>" if by_key[k]["summary"] else "")
+            + "</article>"
+            for k in keys
+        )
+        where = f" — from {repo}" if repo else " — what EEditor puts in a new folder"
+        sections.append(f'<section class="lib-group" id="{g}"><h2>{label}<span class="where">{html.escape(where)}</span></h2><div class="doc-grid">{cards}</div></section>')
+    body = (
+        '<h1 id="top">The library</h1>'
+        "<p class=\"lede\">Every Markdown document of both projects, the sample workspace EEditor offers a new folder — "
+        "the welcome note and the <b>TRY ME</b> tutorial among them — and the EELisp sources the catalog points into. "
+        "Each page links to the others, and to the file it was made from.</p>"
+        + "".join(sections)
+    )
+    nav = nav_html(files, "", page)
+    (out / page).write_text(page_html("The library", page, body, nav, [], rel_href(page, "library/"), "content/ in this repository"), encoding="utf-8")
+
+
 # ── the build ────────────────────────────────────────────────────────────────
 
 
-def build(eeditor: Path, eelisp: Path, out: Path, regen: bool) -> dict:
+def build(eeditor: Path, eelisp: Path, out: Path, regen: bool, sample: Path | None = None, sync: bool = False) -> dict:
     if regen:
         # The EELisp book and reference are generated from the engine's source; make sure they
         # match it, whatever was last committed.
@@ -333,8 +695,10 @@ def build(eeditor: Path, eelisp: Path, out: Path, regen: bool) -> dict:
         shutil.rmtree(out)
     out.mkdir(parents=True)
 
-    copy_site(eeditor / "site", out / "eeditor")
-    copy_site(eelisp / "site", out / "eelisp")
+    files = gather(eeditor, eelisp, sample)
+    linker = Linker(files)
+    copy_site(eeditor / "site", out / "eeditor", linker)
+    copy_site(eelisp / "site", out / "eelisp", linker)
     # Hand-written and behind the engine; the book's reference is generated from it.
     (out / "eelisp" / "reference.html").write_text(redirect("docs.html#reference", "EELisp function reference"), encoding="utf-8")
 
@@ -372,6 +736,9 @@ def build(eeditor: Path, eelisp: Path, out: Path, regen: bool) -> dict:
         ],
     }
 
+    library = build_library(files, out, eelisp)
+    synced = sync_content(files, sample_made(files)) if sync else []
+
     page = read(HERE / "catalog" / "index.html")
     counts = {}
     for it in items:
@@ -386,6 +753,10 @@ def build(eeditor: Path, eelisp: Path, out: Path, regen: bool) -> dict:
         "{{EEDITOR_SHA}}": html.escape(meta["eeditor"]["sha"]),
         "{{EELISP_SHA}}": html.escape(meta["eelisp"]["sha"]),
         "{{TOTAL}}": str(len(items)),
+        "{{LIBRARY_COUNT}}": str(len(library)),
+        "{{PIM_TUTORIAL}}": site_path("sample-workspace/TRY ME.md") if "sample-workspace/TRY ME.md" in files else site_path("eeditor/docs/PIM.md"),
+        "{{PIM_GUIDE}}": site_path("eeditor/docs/PIM.md"),
+        "{{WELCOME}}": site_path("sample-workspace/welcome.md"),
     }
     for k, v in replacements.items():
         page = page.replace(k, v)
@@ -394,7 +765,14 @@ def build(eeditor: Path, eelisp: Path, out: Path, regen: bool) -> dict:
         shutil.copy(HERE / "catalog" / static, out / static)
     (out / "catalog.json").write_text(json.dumps({"items": items, "meta": meta}, ensure_ascii=False, indent=1), encoding="utf-8")
     (out / ".nojekyll").write_text("")
-    return {"items": len(items), "counts": counts, "meta": meta}
+    return {"items": len(items), "counts": counts, "meta": meta, "library": len(library), "synced": synced}
+
+
+def sample_made(files: dict[str, Path]) -> str:
+    """The day the sample workspace was made: its daily note is named after it."""
+    days = [re.match(r"sample-workspace/(\d{4}-\d{2}-\d{2})\.md$", k) for k in files]
+    days = [d.group(1) for d in days if d]
+    return max(days) if days else "an unknown date"
 
 
 def doc_cards(docs: list[tuple[str, str, str, list[str]]]) -> str:
@@ -417,9 +795,13 @@ def main() -> None:
     ap.add_argument("--eelisp", type=Path, default=HERE.parent / "eelisp-rs")
     ap.add_argument("--out", type=Path, default=HERE / "_site")
     ap.add_argument("--regen", action="store_true", help="rebuild the EELisp book from the engine's source first")
+    ap.add_argument("--sample", type=Path, help="a freshly made sample workspace (npm run pim:sample) to use instead of content/sample-workspace")
+    ap.add_argument("--sync", action="store_true", help="bring content/ in this repository in step with the sources")
     args = ap.parse_args()
-    summary = build(args.eeditor.resolve(), args.eelisp.resolve(), args.out.resolve(), args.regen)
+    summary = build(args.eeditor.resolve(), args.eelisp.resolve(), args.out.resolve(), args.regen,
+                    args.sample.resolve() if args.sample else None, args.sync)
     print(f"{summary['items']} entries — " + ", ".join(f"{k} {v}" for k, v in summary["counts"].items()))
+    print(f"library: {summary['library']} pages" + (f"; content/ changed: {len(summary['synced'])} files" if summary["synced"] else ""))
     m = summary["meta"]
     print(f"EEditor {m['eeditor']['version']} ({m['eeditor']['sha']}) · EELisp {m['eelisp']['version']} ({m['eelisp']['sha']}) → {args.out}")
 

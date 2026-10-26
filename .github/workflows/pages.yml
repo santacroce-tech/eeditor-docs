@@ -1,6 +1,7 @@
 # Build the catalog from the two repositories and publish it to GitHub Pages: on every push here,
 # every morning (so a change merged in eeditor-next or eelisp-rs shows up by the next day), and on
-# demand from the Actions tab.
+# demand from the Actions tab. Each run also brings content/ — every Markdown document, kept in
+# this repository — in step with the sources, and commits it when something changed.
 name: Catalog
 
 on:
@@ -9,9 +10,14 @@ on:
   schedule:
     - cron: "17 5 * * *"
   workflow_dispatch:
+    inputs:
+      refresh-sample:
+        description: Make the sample workspace again (npm run pim:sample — builds the engine, takes a few minutes)
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -38,9 +44,34 @@ jobs:
         with:
           python-version: "3.12"
 
+      # The sample workspace is what the app writes into a new folder, dated the day it's made, so
+      # it is only made again when asked; otherwise the copy in content/sample-workspace is used.
+      - if: inputs.refresh-sample
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - if: inputs.refresh-sample
+        uses: dtolnay/rust-toolchain@stable
+      - if: inputs.refresh-sample
+        name: Make the sample workspace
+        run: |
+          (cd eelisp-rs && cargo build --release --bin eelisp)
+          (cd eeditor-next && npm ci && npm run pim:sample -- "$RUNNER_TEMP/sample")
+
       # --regen rebuilds the EELisp book from the engine's source first, so it can't lag behind it
       - name: Build
-        run: python3 eeditor-docs/build.py --eeditor eeditor-next --eelisp eelisp-rs --out _site --regen
+        run: |
+          python3 eeditor-docs/build.py --eeditor eeditor-next --eelisp eelisp-rs --out _site --regen --sync \
+            ${{ inputs.refresh-sample && format('--sample {0}/sample', runner.temp) || '' }}
+
+      - name: Keep content/ in step
+        working-directory: eeditor-docs
+        run: |
+          git add -A content
+          if git diff --cached --quiet; then echo "content/ unchanged"; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "content: in step with eeditor-next $(git -C ../eeditor-next rev-parse --short HEAD) and eelisp-rs $(git -C ../eelisp-rs rev-parse --short HEAD)"
+          git push
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

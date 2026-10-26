@@ -16,6 +16,7 @@
     <nav>
       <a href="#start">Start</a>
       <a href="#documents">Documents</a>
+      <a href="library/index.html">Library</a>
       <a href="#catalog">Catalog</a>
       <a href="#about">About</a>
     </nav>
@@ -37,6 +38,7 @@
       <span class="pill">EEditor <b>{{EEDITOR_VERSION}}</b></span>
       <span class="pill">EELisp <b>{{EELISP_VERSION}}</b></span>
       <span class="pill muted">{{TOTAL}} entries in the catalog</span>
+      <span class="pill muted">{{LIBRARY_COUNT}} documents in the library</span>
     </div>
     <div class="actions">
       <a class="btn primary" href="eeditor/tutorial.html">Start the tutorial</a>
@@ -53,7 +55,8 @@
     <ol class="path">
       <li><a href="eeditor/download.html"><b>Install EEditor</b><span>macOS, Windows or Linux — free, no account. Or try the example apps in your browser first.</span></a></li>
       <li><a href="eeditor/tutorial.html"><b>Your first hour</b><span>A folder, two linked notes, an agenda that files things for you, a shortcut of your own, a form.</span></a></li>
-      <li><a href="https://github.com/santacroce-tech/eeditor-next/blob/main/docs/PIM.md"><b>The PIM tutorial</b><span>Inside the app: open an empty folder and accept the samples — fifteen lessons on the agenda, each saying what to press.</span></a></li>
+      <li><a href="{{WELCOME}}"><b>The sample workspace</b><span>What an empty folder is offered: the welcome note, example forms, a mind map of every shortcut — readable here too.</span></a></li>
+      <li><a href="{{PIM_TUTORIAL}}"><b>TRY ME — the PIM tutorial</b><span>Fifteen lessons on the agenda and the notes kept in step with it, each saying what to press and what you should see.</span></a></li>
       <li><a href="eeditor/manual.html"><b>The manual</b><span>Every feature, chapter by chapter: notes, agenda, sheets, forms, the REPL, keybindings.</span></a></li>
       <li><a href="eelisp/docs.html"><b>Learn the language</b><span>The EELisp book: syntax, data, the database, the agenda and sheets from code.</span></a></li>
       <li><a href="#catalog"><b>Look anything up</b><span>Search builtins, spreadsheet functions, snippets, editor commands and shortcuts below.</span></a></li>
@@ -65,6 +68,7 @@
 <section id="documents">
   <div class="wrap">
     <h2>Documents</h2>
+    <p class="sub">The two projects' sites, here in full. Every other document — design notes, the PIM guide, the EELisp chapters one by one, the sample workspace — is in <a href="library/index.html">the library</a>.</p>
     <div class="cols">
       <div>
         <h3 class="col-head">EEditor — the app</h3>
@@ -98,8 +102,9 @@
       <h2>About this catalog</h2>
       <p>
         It is built from the two repositories, not written by hand: the manuals and sites are copied
-        from them, and the catalog is read from the engine's own function reference, the spreadsheet
-        library, the snippets and the keybindings file. It is rebuilt every day and whenever this
+        from them, every Markdown document is kept in this repository's <code>content/</code> folder and
+        published in the library, and the catalog is read from the engine's own function reference,
+        the spreadsheet library, the snippets and the keybindings file. It is rebuilt every day and whenever this
         repository changes, so what you read here is what the code does.
       </p>
       <p class="meta">Built {{BUILT}} · eeditor-next <code>{{EEDITOR_SHA}}</code> · eelisp-rs <code>{{EELISP_SHA}}</code> · also as <a href="catalog.json">catalog.json</a></p>
@@ -107,8 +112,9 @@
     <div>
       <h2>The projects</h2>
       <ul class="links">
-        <li><a href="https://eeditor.app">eeditor.app</a> — the app's home</li>
-        <li><a href="https://eelisp.app">eelisp.app</a> — the language's home</li>
+        <li><a href="eeditor/index.html">EEditor</a> — the app's home page (also at eeditor.app)</li>
+        <li><a href="eelisp/index.html">EELisp</a> — the language's home page (also at eelisp.app)</li>
+        <li><a href="library/index.html">The library</a> — every Markdown document, and the sample workspace</li>
         <li><a href="https://github.com/santacroce-tech/eeditor-next">santacroce-tech/eeditor-next</a> — the app's source</li>
         <li><a href="https://github.com/santacroce-tech/eelisp-rs">santacroce-tech/eelisp-rs</a> — the engine's source</li>
         <li><a href="https://github.com/santacroce-tech/eeditor-docs">santacroce-tech/eeditor-docs</a> — this catalog</li>
