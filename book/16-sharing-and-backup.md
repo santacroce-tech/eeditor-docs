@@ -36,78 +36,63 @@ years, write your tables out as JSON — text, one file per table.
 The agenda has its own export, with its categories, rules and views:
 
 ```eelisp
-(export-agenda "eeditor" :format :json :path (str (current-dir) "/.eeditor/agenda-export.json"))
-(str-starts-with (read-note ".eeditor/agenda-export.json") "{")    ; → true
+(export-agenda "eeditor" :format :json :path (str (current-dir) "/backup/2026-10-26/agenda.json"))
+(str-starts-with (read-note "backup/2026-10-26/agenda.json") "{")    ; → true
 ```
 
 `"eeditor"` is the name of the folder's agenda (`(agendas)` lists them). The path is given in full,
 built from `(current-dir)` — the folder — so the file lands in it and not wherever EEditor happens
-to run from. It goes into `.eeditor/` because that folder always exists: `export-agenda` doesn't
-create folders, and EELisp has no way to make one. `ed-write` does — so the key below exports
-there first, then copies the file into the dated backup folder with `ed-write`.
+to run from; the `backup/2026-10-26/` folder is made if it isn't there.
 
-Your own tables need a few lines. A row prints as a record, not as JSON, so turn each row into a
-dict of its fields first:
+Your own tables take one line each. A row prints as a record, not as JSON; `record->dict` turns it
+into a plain dict — its id and every field — that `json-stringify` can write:
 
 ```eelisp
-(defn row->dict (r fields)
-  (reduce (fn (d f) (dict-set d f (field-get r f))) {} fields))
+(defn table-json (name)
+  (json-stringify (map record->dict (records (query (str name))))))
 
-;; a table's rows by its name — query takes the name itself, so the call is built as text
-(defn table-rows (name)
-  (records (eval (parse (str "(query " name ")")))))
-
-(defn table-json (name fields)
-  (json-stringify (map (fn (r) (row->dict r fields)) (table-rows name))))
-
-(length (json-parse (table-json "holdings" (list :symbol :kind :qty :cost))))    ; → 3
+(length (json-parse (table-json "holdings")))    ; → 3
 ```
 
-Three holdings — the two from chapter 7 and chapter 12's purchase. One key writes them all:
+Three holdings — the two from chapter 7 and chapter 12's purchase. `(query (str name))` is how to
+name a table held in a variable: the table's place takes a name as written, `holdings`, or the
+result of a call — and `(str name)` is a call whose result is the name.
+
+One key writes them all:
 
 ```eelisp keys
 (on-load
-  (defn row->dict (r fields)
-    (reduce (fn (d f) (dict-set d f (field-get r f))) {} fields))
+  (defn table-json (name)
+    (json-stringify (map record->dict (records (query (str name))))))
 
-  (defn table-rows (name)
-    (records (eval (parse (str "(query " name ")")))))
+  (def backup-tables (list "accounts" "transactions" "holdings" "prices" "alerts"))
 
-  (defn table-json (name fields)
-    (json-stringify (map (fn (r) (row->dict r fields)) (table-rows name))))
-
-  ;; table name → its fields, for the backup
-  (def backup-tables
-    (list (list "accounts"     (list :name :kind :currency))
-          (list "transactions" (list :day :account :amount :category :note))
-          (list "holdings"     (list :symbol :kind :qty :cost))
-          (list "prices"       (list :symbol :kind :price :currency :at :source))
-          (list "alerts"       (list :symbol :direction :level :fired))))
-
-  ;; one ed-write per table, one for the agenda's own export, then a message
+  ;; the agenda's export, then one ed-write per table, then a message
   (defn backup-all ()
     (let (dir (str "backup/" *date*))
-      (do (export-agenda "eeditor" :format :json :path (str (current-dir) "/.eeditor/agenda-export.json"))
-          (append (map (fn (t) (ed-write (str dir "/" (first t) ".json") (table-json (first t) (second t))))
-                       backup-tables)
-                  (list (ed-write (str dir "/agenda.json") (read-note ".eeditor/agenda-export.json"))
-                        (ed-message (str "Backed up " (length backup-tables) " tables and the agenda to " dir))))))))
+      (do (export-agenda "eeditor" :format :json :path (str (current-dir) "/" dir "/agenda.json"))
+          (append (map (fn (t) (ed-write (str dir "/" t ".json") (table-json t))) backup-tables)
+                  (list (ed-message (str "Backed up " (length backup-tables) " tables and the agenda to " dir))))))))
 
 ;; ⌘⇧0 — everything as JSON, in backup/<today>/
 (bind "Mod-Shift-0" (backup-all))
 ```
 
 ```eelisp
-(length (backup-all))    ; → 7
+(length (backup-all))    ; → 6
 ```
 
-Six `ed-write`s and a message: **⌘⇧0** writes `backup/2026-10-26/transactions.json` and the rest,
-and the agenda's export beside them as `agenda.json`. Run it weekly — on Sunday, after the review.
+Five `ed-write`s and a message: **⌘⇧0** writes `backup/2026-10-26/transactions.json` and the rest,
+next to the agenda's `agenda.json`. Run it weekly — on Sunday, after the review.
 
-Reading one back is the same in reverse — `json-parse` the file, `insert` each dict:
+Reading one back is the same in reverse — `json-parse` the file, `insert` each row — except that a
+row's `id` belongs to the table it came from, so it's left out:
 
 ```eelisp norun
-(map (fn (d) (insert holdings d)) (json-parse (read-note "backup/2026-10-26/holdings.json")))
+(defn without-id (d)
+  (reduce (fn (acc k) (if (= k :id) acc (dict-set acc k (dict-get d k)))) {} (dict-keys d)))
+
+(map (fn (d) (insert holdings (without-id d))) (json-parse (read-note "backup/2026-10-26/holdings.json")))
 (import-agenda (str (current-dir) "/backup/2026-10-26/agenda.json"))
 ```
 

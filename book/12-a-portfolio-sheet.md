@@ -38,7 +38,8 @@ refresh away from the sheet:
   (let (hs   (records (query holdings :order "symbol"))
         last (+ 1 (length hs))
         tot  (+ 2 last))
-    (do (sheet-set "Portfolio" "A1"
+    (do (sheet-clear "Portfolio" "A:G")
+        (sheet-set "Portfolio" "A1"
           (append (list (list "Symbol" "Qty" "Cost" "Price" "Value" "Gain" "Gain %"))
                   (map (fn (i) (portfolio-row (+ i 2) (nth hs i))) (range (length hs)))
                   (list (list "" "" "" "" "" "" ""))))
@@ -95,7 +96,8 @@ changes (chapter 9). So the fetch should finish by recalculating the sheet. Rede
     (let (hs   (records (query holdings :order "symbol"))
           last (+ 1 (length hs))
           tot  (+ 2 last))
-      (do (sheet-set "Portfolio" "A1"
+      (do (sheet-clear "Portfolio" "A:G")
+        (sheet-set "Portfolio" "A1"
             (append (list (list "Symbol" "Qty" "Cost" "Price" "Value" "Gain" "Gain %"))
                     (map (fn (i) (portfolio-row (+ i 2) (nth hs i))) (range (length hs)))
                     (list (list "" "" "" "" "" "" ""))))
@@ -137,8 +139,8 @@ A holding you buy:
 ```
 
 Two bitcoin rows now — two purchases at two prices, each with its own gain — and the total moves
-to row 6. (`portfolio-write` writes rows over the old ones; with fewer holdings than before, clear
-the leftover rows by hand or delete the sheet's rows first, as chapter 9's `ledger-refresh` does.)
+to row 6. `portfolio-write` empties the sheet first (`sheet-clear` on columns A to G), so selling a
+holding leaves no stale row behind either.
 
 ## On the dashboard
 

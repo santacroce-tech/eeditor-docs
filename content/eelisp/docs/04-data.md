@@ -155,12 +155,39 @@ Format patterns follow the Unicode convention:
 
 JSON objects become dicts, with their keys sorted. Arrays become lists, and `null` becomes `nil`.
 
+## CSV
+
+```lisp
+(csv-parse "symbol,price\nAAPL,231.5\nMSFT,412")
+; → (("symbol" "price") ("AAPL" "231.5") ("MSFT" "412"))
+(csv-records "symbol,price\nAAPL,231.5\nMSFT,412")
+; → ({:symbol "AAPL" :price 231.5} {:symbol "MSFT" :price 412})
+(csv-stringify '(("name" "note") ("Ada" "first, and best")))
+; → "name,note\nAda,\"first, and best\""
+```
+
+`csv-parse` gives rows of text; `csv-records` reads the first row as names and gives one dict per
+row, with numbers as numbers and empty cells as `nil`. Both follow the usual quoting — a cell in
+quotes may hold the separator, a line break, or a quote written twice — and take the separator as a
+second argument: `"\t"` for tab-separated text. They read exactly what EEditor's *Import as sheet*
+reads.
+
 ## The network
 
 ```lisp
 (http-get "https://example.com/api")            ; → {:status 200 :body "…"}
 (http-post "https://example.com/api" body)      ; → {:status … :body …}
 (json-parse (dict-get (http-get url) :body))    ; a JSON API, read
+```
+
+Both take options after the URL (and a POST's body): `:timeout` in seconds — 30 unless given, at
+most 300 — and `:headers`, a dict sent with the request, which is where most services want their
+key; a POST also takes `:content-type` (`application/json` unless given):
+
+```lisp
+(http-get "https://api.example.com/quote?symbol=AAPL"
+          :timeout 5
+          :headers {"x-api-key" key "accept" "application/json"})
 ```
 
 These are the only functions that reach the network, and they're synchronous. Every answer comes

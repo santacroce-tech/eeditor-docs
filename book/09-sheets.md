@@ -66,7 +66,7 @@ the REPL, which is what this does — `sheet-set` given a list of rows types a b
         (str "=(round (- 0 (sumif Ledger!D:D A" n " Ledger!C:C)) 2)")
         (str "=(round (- B" n " C" n ") 2)")
         (str "=(countif Ledger!D:D A" n ")")
-        (str "=(let (a (averageif Ledger!D:D A" n " Ledger!C:C)) (if (nil? a) 0 (round (- 0 a) 2)))")))
+        (str "=(iferror (round (- 0 (averageif Ledger!D:D A" n " Ledger!C:C)) 2) 0)")))
 
 (sheet-set "Budget" "A1"
   (cons (list "Category" "Plan" "Spent" "Left" "Times" "Average")
@@ -76,10 +76,10 @@ the REPL, which is what this does — `sheet-set` given a list of rows types a b
 (sheet-set "Budget" "A10" (list (list "Total" "=(sum B2:B8)" "=(round (sum C2:C8) 2)" "=(round (- B10 C10) 2)")))
 ```
 
-**Average** is the one formula that has to be careful: `averageif` gives `nil` when a category has
-no rows, and `(round nil 2)` is an error. So it checks first — `(if (nil? a) 0 …)`. (EELisp can't
-catch an error yet, so there's no `iferror`; it's on the
-[roadmap](https://github.com/santacroce-tech/eeditor-next/blob/main/docs/ROADMAP.md).)
+**Average** is the one formula that can fail: `averageif` gives `nil` when a category has no rows,
+and `(- 0 nil)` is an error — the cell would show **#ERR**. `iferror` catches that: the value of the
+first expression, or the second — here 0 — if the first fails. It works around any formula that
+might: a division by an empty cell, a `vlookup` that finds nothing.
 
 What October looks like:
 
@@ -119,19 +119,18 @@ Ledger again and recalculates the Budget:
 (on-load
   ;; rewrite the Ledger from the transactions table, then recalculate the Budget
   (defn ledger-refresh ()
-    (let (old (length (sheet-rows "Ledger" "A:A")))
-      (do (if (> old 0) (sheet-delete-rows "Ledger" 1 old) nil)
-          (sheet-put "Ledger" "A1" (query transactions :order "day"))
-          (sheet-recalc "Budget")
-          (count-records transactions)))))
+    (do (sheet-clear "Ledger" "A:E")
+        (sheet-put "Ledger" "A1" (query transactions :order "day"))
+        (sheet-recalc "Budget")
+        (count-records transactions))))
 
 ;; ⌘⇧L — the Ledger and the Budget, up to date
 (bind "Mod-Shift-l" (ed-message (str "Ledger: " (ledger-refresh) " transactions")))
 ```
 
-It deletes the Ledger's old rows first — writing fewer rows over more would leave the old ones
-behind — then writes the table, then recalculates the Budget, so even the formulas that read the
-table directly are current.
+It empties the Ledger first — `sheet-clear` on columns A to E, the whole of them — because writing
+fewer rows over more would leave the old ones behind; then it writes the table, then recalculates
+the Budget, so even the formulas that read the table directly are current.
 
 ```eelisp
 (insert transactions {:day "2026-10-26" :account "Card" :amount -9.9 :category "food" :note "bakery"})

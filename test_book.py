@@ -164,9 +164,12 @@ def setup(engine: Engine, eeditor: Path) -> None:
         "the fixtures",
     )
     engine.must(
-        "(defn http-get (url)"
+        # options (:timeout, :headers) accepted and ignored; an address under .invalid can't
+        # resolve, so — like the real thing offline — it fails rather than answering
+        "(defn http-get (url . options)"
+        '  (if (str-contains url ".invalid/") (error (str "HTTP request failed: " url ": no such host"))'
         "  (let (hit (filter (fn (f) (str-starts-with url (first f))) *fixtures*))"
-        '    (if (empty? hit) {:status 404 :body "no fixture"} {:status 200 :body (second (first hit))})))',
+        '    (if (empty? hit) {:status 404 :body "no fixture"} {:status 200 :body (second (first hit))}))))',
         "the stand-in http-get",
     )
 
@@ -255,6 +258,14 @@ def chapters() -> list[Path]:
     return sorted(BOOK.glob("[0-9][0-9]-*.md"))
 
 
+def pim_block(eeditor: Path, pim: str) -> str:
+    """The PIM as install-pim writes it: between the markers in eeditor-next src/core/pim-install.ts,
+    so the companion workspace's file is what the command would have made."""
+    ts = (eeditor / "src" / "core" / "pim-install.ts").read_text(encoding="utf-8")
+    marker = lambda name: re.search(rf'export const {name} =\s*"([^"]*)"', ts).group(1)
+    return f"{marker('PIM_BEGIN')}\n{marker('PIM_BEGIN_2')}\n\n{pim.rstrip()}\n\n{marker('PIM_END')}\n"
+
+
 def assemble(eeditor: Path) -> Path:
     """The companion workspace's keybindings: EEditor's defaults, then every chapter's keys blocks
     in order — with the PIM library where its chapter installs it. The file a reader has after
@@ -269,7 +280,7 @@ def assemble(eeditor: Path) -> Path:
                 if "keys" in info.split() and "superseded" not in info.split() and code.strip() not in default]
         section = []
         if "<!-- test: pim -->" in md:
-            section.append(pim.rstrip() + "\n")
+            section.append(pim_block(eeditor, pim))
             (WORKSPACE / "pim").mkdir(exist_ok=True)
             shutil.copy(eeditor / "docs" / "pim" / "Capture.eeform", WORKSPACE / "pim" / "Capture.eeform")
         section += [k.rstrip() + "\n" for k in keys]

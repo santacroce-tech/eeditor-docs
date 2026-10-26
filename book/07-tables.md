@@ -22,8 +22,8 @@ forms. This chapter makes the three tables the rest of the book stands on.
 
 A field is `name:type`, or a list when it needs more: a `:default`, `:required true`, `:choices`.
 The types are `string`, `number`, `bool`, `date`, `memo` (long text) and `choice`. Choices guide
-the forms that edit a table (chapter 8 shows a dropdown); `insert` itself doesn't refuse a value
-outside them.
+the forms that edit a table (chapter 8 shows a dropdown), and the table holds to them: `insert` or
+`update` with a value outside them is refused, naming the field and its choices.
 
 - **transactions** — money in is positive, money out is negative; `day` is `"2026-10-05"`, which
   sorts and compares as text in date order
@@ -55,7 +55,15 @@ keybindings' `on-load` (below).
 (insert holdings {:symbol "ethereum" :kind "crypto" :qty 1.2 :cost 2900})
 ```
 
-A dict literal like `{:day "2026-10-01" …}` is one row. The last transaction has no category:
+```eelisp
+(try (insert holdings {:symbol "gold" :kind "metal" :qty 1 :cost 2400})
+  (catch e (dict-get e :message)))
+; e.g. "Database error: holdings.kind must be one of crypto, stock, fx, not \"metal\""
+(count-records holdings)    ; → 2
+```
+
+`try` runs an expression and, if it fails, hands the error to `catch` instead of stopping — here
+just to show the message. A dict literal like `{:day "2026-10-01" …}` is one row. The last transaction has no category:
 it gets the default, `"other"`. `insert` returns the row it made, id included.
 
 **`(browse transactions)`** at the REPL shows the table as a grid — sortable, scrollable. It's the

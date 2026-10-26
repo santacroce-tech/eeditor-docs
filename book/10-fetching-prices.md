@@ -44,22 +44,28 @@ A request can fail in two ways, and EELisp sees them differently:
 
 - **The service answers, but not with a price** — a typo in the address (404), *too many
   requests* (429), the service down (5xx). `http-get` still returns its dict, with that `:status`.
-- **Nothing answers** — no connection, a name that doesn't resolve, 30 seconds of silence.
-  `http-get` stops with an error, *HTTP request failed: …*, and EELisp has no way yet to catch an
-  error and carry on ([on the roadmap](https://github.com/santacroce-tech/eeditor-next/blob/main/docs/ROADMAP.md)).
+- **Nothing answers** — no connection, a name that doesn't resolve, a service that hangs.
+  `http-get` stops with an error, *HTTP request failed: …*.
 
-The first kind is the common one, so the one function every fetch goes through checks the status
-and gives back `nil` instead of a price:
+The one function every fetch goes through handles both, and gives back `nil` instead of a price:
 
 ```eelisp
 (defn fetch-json (url)
-  (let (r (http-get url))
-    (if (= (dict-get r :status) 200)
-        (json-parse (dict-get r :body))
-        nil)))
+  (try (let (r (http-get url :timeout 10))
+         (if (= (dict-get r :status) 200)
+             (json-parse (dict-get r :body))
+             nil))
+    (catch e nil)))
 
 (nil? (fetch-json "https://api.frankfurter.app/latest?from=USD&to=EUR"))    ; → false
+(fetch-json "https://prices.invalid/")                                        ; → nil
 ```
+
+- `:timeout 10` gives up on a service after ten seconds instead of the default thirty — a key
+  or the clock waits that long at most.
+- `try` runs its body and, if it stops with an error, runs `catch` instead — here, simply `nil`.
+  `prices.invalid` is an address that can never resolve, which is what being offline looks like
+  to `http-get`; `fetch-json` turns it into `nil` like a refused request.
 
 ## A table for prices
 
@@ -102,8 +108,8 @@ That is what lets it sit in `(on-load …)`, which runs on every save.
 (fetch-fx)        ; → 3
 ```
 
-Each returns how many prices it saved — 0 when the service said no, so a refused request costs
-nothing.
+Each returns how many prices it saved — 0 when the fetch failed, offline or refused, so a bad
+minute costs nothing.
 `*now*` is the moment as `"2026-10-26 09:30:00"`, which sorts as text in time order.
 
 Look at what you have: `(browse prices)` at the REPL shows the table as a grid.
@@ -144,8 +150,9 @@ Put it all in your keybindings file, so it's there every time EEditor starts:
   (def fx-to (list "EUR" "BRL" "GBP"))
 
   (defn fetch-json (url)
-    (let (r (http-get url))
-      (if (= (dict-get r :status) 200) (json-parse (dict-get r :body)) nil)))
+    (try (let (r (http-get url :timeout 10))
+           (if (= (dict-get r :status) 200) (json-parse (dict-get r :body)) nil))
+      (catch e nil)))
 
   (defn fetch-crypto ()
     (let (data (fetch-json (str "https://api.coingecko.com/api/v3/simple/price?ids="
@@ -175,7 +182,7 @@ Put it all in your keybindings file, so it's there every time EEditor starts:
 ;; ⌘⇧Q — fetch now, and say how it went
 (bind "Mod-Shift-q"
   (let (n (refresh-prices))
-    (ed-message (if (= n 0) "No prices — the services said no; try again in a minute" (str n " prices saved")))))
+    (ed-message (if (= n 0) "No prices — offline, or the services said no; try again in a minute" (str n " prices saved")))))
 ```
 
 And the clock:
@@ -192,16 +199,13 @@ And the clock:
 :45. It ends in `(ed-nothing)` because whatever an on-tick returns is carried out as commands, and
 a fetch count isn't one.
 
-Three things to know:
+Two things to know:
 
-- **Offline, it says so once.** With no connection the fetch stops with an error. On ⌘⇧Q you see
-  it; on the clock it's written to the REPL once — not every 15 minutes — and the next tick simply
-  tries again.
 - **It only runs while EEditor is open.** Nothing fetches in the background with the app closed;
   the first tick after you open it catches up.
 - **A fetch holds the engine while it waits.** `http-get` is synchronous, so for the second or two
-  a request takes, keys and the REPL wait too. Two small requests every 15 minutes won't be
-  noticed; fifty would.
+  a request takes — ten at most, with `:timeout 10` — keys and the REPL wait too. Two small requests
+  every 15 minutes won't be noticed; fifty would.
 
 ## A line in today's note
 
@@ -222,6 +226,12 @@ one. The pattern is the same as above with a key from a provider you sign up for
 for instance, offers a free key with a small daily allowance. Its quote endpoint looks like this,
 but check the provider's own documentation: this block is **not tested** by the book, because the
 test can't use a real key.
+
+Some services want the key in the address, like this one; most want it in a header, which is what
+`:headers` is for — `(http-get url :headers {"x-api-key" key})`. CoinGecko's free key, for one,
+goes in `x-cg-demo-api-key`. And a service that answers in CSV instead of JSON is read with
+`csv-records`: `(csv-records (dict-get r :body))` gives one dict per row, keyed by the header line,
+with numbers as numbers.
 
 ```eelisp norun
 (def av-key "YOUR-KEY")

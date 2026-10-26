@@ -147,7 +147,7 @@ def sheet_functions(src: str) -> list[dict]:
             block.append(line[2:].strip())
             continue
         fresh = False
-        m = re.match(r"\(defn\s+(\S+)\s+\(([^)]*)\)", line)
+        m = re.match(r"\((?:defn|defmacro)\s+(\S+)\s+\(([^)]*)\)", line)
         if not m:
             continue
         name, params = m.group(1), m.group(2).strip()

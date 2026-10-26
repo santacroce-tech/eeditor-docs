@@ -71,6 +71,16 @@ again on the day you try it (it starts from scratch each time). It needs the eng
 
 ## Install
 
+**One command:** right-click the workspace in the file tree and choose **Install the PIM keys…**
+(or run the `install-pim` command — `(ed-cmd "install-pim")` at the REPL, or bind it to a key). It
+adds the PIM to the end of the folder's keybindings between two marker lines, copies the capture
+window to `pim/Capture.eeform`, and reloads: ⌘⌥K says *No clock running* straight away. Your own
+keys stay as they were; if your file already says what opens at launch, the PIM's `(on-start …)` is
+left out. Run it again after an update to EEditor and it replaces what's between the markers —
+nothing else. (The sample notes put the PIM in with the same markers.)
+
+**By hand**, as before:
+
 1. ⌘⇧K opens `.eeditor/keybindings.eelisp`. **Append** the whole of `docs/pim/pim.eelisp` to it
    (keep your own `bind`s; later bindings win, so the PIM's ⌘D replaces the plain daily note).
    If your file already has an `(on-start …)`, delete it — the PIM's opens today's note.
@@ -250,13 +260,11 @@ The library's building blocks, all callable in blocks, the REPL and your own bin
 - **`items` / `items-on` return result sets**; wrap them in `records` to `map`/`filter`.
 - **`item-done` forgets the item** (soft delete). That is why the `done` table exists: without it
   the weekly review would have nothing to show.
-- **`defcategory` doesn't evaluate its argument** — `(defcategory c)` defines a category called
-  "c". The library builds the form as text: `(eval (parse (str "(defcategory " c ")")))`.
-- **`assign` doesn't define the category**, so it's missing from `(categories)` and the panel's
-  list. Define it first (`pim-file-under` does both).
-- **`(items :category "work")` doesn't include `work/admin`**; `pim-category` does.
-- **With `(auto-categorize true)`, the item `add` returns is from before the rules ran** — read it
-  again with `item-get`.
+- **Fixed in the engine since, so no longer a trap** (checked 2026-10-26): `defcategory` evaluates
+  its argument (`(defcategory (str "home/" room))` works); `assign` defines a category it doesn't
+  know; `(items :category "work")` includes `work/admin`; and with `(auto-categorize true)`, the
+  item `add` returns already has what the rules assigned. The library still does it the long way
+  (`pim-file-under`, `pim-category`, defining a category as text), which keeps working.
 - **Templates are broken in the engine today:** `from-template` drops the item's text, and running
   `deftemplate` again adds a second template of the same name (the docs' `(deftemplate x (…))`
   shape errors too; it takes flat keywords). The capture window uses categories instead.

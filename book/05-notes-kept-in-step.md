@@ -16,17 +16,18 @@ refile, a time clock and a tracker for the things you do every day.
 
 ## Install the PIM
 
-The PIM is a keybindings file of its own: [`pim.eelisp`](https://github.com/santacroce-tech/eeditor-next/blob/main/docs/pim/pim.eelisp).
-Installing it means adding it to yours:
+The PIM is a keybindings file of its own — [`pim.eelisp`](https://github.com/santacroce-tech/eeditor-next/blob/main/docs/pim/pim.eelisp) — and installing it
+means adding it to yours. EEditor does that for you: right-click the workspace (the top row of the
+file tree) and choose **Install the PIM keys…**. It
 
-1. Open the PIM's file above, select all of it and copy it.
-2. **⌘⇧K** opens your keybindings. Go to the very end and paste.
-3. Save (**⌘S**). The library loads at once — it's an `(on-load …)`, like your own functions.
-4. Copy [`Capture.eeform`](https://github.com/santacroce-tech/eeditor-next/blob/main/docs/pim/Capture.eeform) into the folder as
-   `pim/Capture.eeform` — the capture window from **⌘⌥N**.
+- adds the PIM to the end of `.eeditor/keybindings.eelisp`, between two marker lines — your own
+  keys from chapters 2–4 stay exactly as they are
+- copies the capture window, [`Capture.eeform`](https://github.com/santacroce-tech/eeditor-next/blob/main/docs/pim/Capture.eeform), to `pim/Capture.eeform`
+- reloads, so the keys work at once
 
-(The companion workspace has both already. A future version of EEditor will do this with one
-command — it's on [the roadmap](https://github.com/santacroce-tech/eeditor-next/blob/main/docs/ROADMAP.md).)
+Run it again after updating EEditor and it replaces what's between the markers — the PIM's part —
+and nothing else. (It's also a command, `install-pim`, so `(ed-cmd "install-pim")` at the REPL
+does the same.)
 
 Check it took: press **⌘⌥K** anywhere in a note. A message at the bottom says *No clock running* —
 the PIM's keys are live. Its keys are all **⌘⌥** plus a letter (Ctrl+Alt on Windows and Linux), so
@@ -90,7 +91,8 @@ new agenda item:
   (set! pim-agenda-files (list "inbox.md" "projects")))
 ```
 
-It goes *after* the PIM's own `on-load` in the file — yours runs second, so your setting wins.
+Put it *after* the PIM's end marker — your `on-load` runs after the PIM's, so your setting wins,
+and installing the PIM again later won't touch it.
 `pim-agenda-files` takes notes and folders; a folder means every note in it.
 
 ## Capture: ⌘⌥N

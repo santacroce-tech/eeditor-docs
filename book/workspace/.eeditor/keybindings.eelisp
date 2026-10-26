@@ -127,6 +127,7 @@
 ;; open-file           pick a file from anywhere; asks whether to copy it in or edit it in place
 ;; copy-into-workspace turn the current ↗ (outside) note into a copy in the workspace
 ;; add-samples         add the sample notes and the PIM tour to this folder (keeps what is there)
+;; install-pim         the PIM's keys and library into this file (again: updates them, keeps yours)
 ;; about               who makes EEditor, and which version this is
 ;; insert-image        pick images; each is copied into assets/ beside the note and linked at the caret
 
@@ -196,6 +197,9 @@
   (auto-categorize true))
 
 ;; ══ Zero to Hero — chapter 5. Notes kept in step ══════════════════════════════
+
+;; ══ The PIM — put here by EEditor's install-pim. Installing again replaces everything down to the end marker;
+;; ══ keep your own bindings and settings outside these two lines. ══
 
 ;; ═══ EEditor PIM — org-mode habits in EELisp ════════════════════════════════════════════════
 ;;
@@ -807,6 +811,8 @@
 ;; ⌘⌥G — file the caret's task under a category
 (bind "Mod-Alt-g" (ed-prompt "Category" pim-set-category "" (pim-category-names)))
 
+;; ══ end of the PIM ══
+
 (on-load
   (set! pim-agenda-files (list "inbox.md" "projects")))
 
@@ -871,11 +877,10 @@
 (on-load
   ;; rewrite the Ledger from the transactions table, then recalculate the Budget
   (defn ledger-refresh ()
-    (let (old (length (sheet-rows "Ledger" "A:A")))
-      (do (if (> old 0) (sheet-delete-rows "Ledger" 1 old) nil)
-          (sheet-put "Ledger" "A1" (query transactions :order "day"))
-          (sheet-recalc "Budget")
-          (count-records transactions)))))
+    (do (sheet-clear "Ledger" "A:E")
+        (sheet-put "Ledger" "A1" (query transactions :order "day"))
+        (sheet-recalc "Budget")
+        (count-records transactions))))
 
 ;; ⌘⇧L — the Ledger and the Budget, up to date
 (bind "Mod-Shift-l" (ed-message (str "Ledger: " (ledger-refresh) " transactions")))
@@ -888,8 +893,9 @@
   (def fx-to (list "EUR" "BRL" "GBP"))
 
   (defn fetch-json (url)
-    (let (r (http-get url))
-      (if (= (dict-get r :status) 200) (json-parse (dict-get r :body)) nil)))
+    (try (let (r (http-get url :timeout 10))
+           (if (= (dict-get r :status) 200) (json-parse (dict-get r :body)) nil))
+      (catch e nil)))
 
   (defn fetch-crypto ()
     (let (data (fetch-json (str "https://api.coingecko.com/api/v3/simple/price?ids="
@@ -919,7 +925,7 @@
 ;; ⌘⇧Q — fetch now, and say how it went
 (bind "Mod-Shift-q"
   (let (n (refresh-prices))
-    (ed-message (if (= n 0) "No prices — the services said no; try again in a minute" (str n " prices saved")))))
+    (ed-message (if (= n 0) "No prices — offline, or the services said no; try again in a minute" (str n " prices saved")))))
 
 (bind "Mod-Shift-y"
   (ed-append (str *date* ".md")
@@ -1000,7 +1006,8 @@
     (let (hs   (records (query holdings :order "symbol"))
           last (+ 1 (length hs))
           tot  (+ 2 last))
-      (do (sheet-set "Portfolio" "A1"
+      (do (sheet-clear "Portfolio" "A:G")
+        (sheet-set "Portfolio" "A1"
             (append (list (list "Symbol" "Qty" "Cost" "Price" "Value" "Gain" "Gain %"))
                     (map (fn (i) (portfolio-row (+ i 2) (nth hs i))) (range (length hs)))
                     (list (list "" "" "" "" "" "" ""))))
@@ -1104,31 +1111,17 @@
 ;; ══ Zero to Hero — chapter 16. Sharing and backup ══════════════════════════════
 
 (on-load
-  (defn row->dict (r fields)
-    (reduce (fn (d f) (dict-set d f (field-get r f))) {} fields))
+  (defn table-json (name)
+    (json-stringify (map record->dict (records (query (str name))))))
 
-  (defn table-rows (name)
-    (records (eval (parse (str "(query " name ")")))))
+  (def backup-tables (list "accounts" "transactions" "holdings" "prices" "alerts"))
 
-  (defn table-json (name fields)
-    (json-stringify (map (fn (r) (row->dict r fields)) (table-rows name))))
-
-  ;; table name → its fields, for the backup
-  (def backup-tables
-    (list (list "accounts"     (list :name :kind :currency))
-          (list "transactions" (list :day :account :amount :category :note))
-          (list "holdings"     (list :symbol :kind :qty :cost))
-          (list "prices"       (list :symbol :kind :price :currency :at :source))
-          (list "alerts"       (list :symbol :direction :level :fired))))
-
-  ;; one ed-write per table, one for the agenda's own export, then a message
+  ;; the agenda's export, then one ed-write per table, then a message
   (defn backup-all ()
     (let (dir (str "backup/" *date*))
-      (do (export-agenda "eeditor" :format :json :path (str (current-dir) "/.eeditor/agenda-export.json"))
-          (append (map (fn (t) (ed-write (str dir "/" (first t) ".json") (table-json (first t) (second t))))
-                       backup-tables)
-                  (list (ed-write (str dir "/agenda.json") (read-note ".eeditor/agenda-export.json"))
-                        (ed-message (str "Backed up " (length backup-tables) " tables and the agenda to " dir))))))))
+      (do (export-agenda "eeditor" :format :json :path (str (current-dir) "/" dir "/agenda.json"))
+          (append (map (fn (t) (ed-write (str dir "/" t ".json") (table-json t))) backup-tables)
+                  (list (ed-message (str "Backed up " (length backup-tables) " tables and the agenda to " dir))))))))
 
 ;; ⌘⇧0 — everything as JSON, in backup/<today>/
 (bind "Mod-Shift-0" (backup-all))
