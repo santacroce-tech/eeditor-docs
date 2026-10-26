@@ -9,9 +9,9 @@ Each chapter ends with something that works, and the next builds on it. The code
 chapter is run against the real engine whenever this book is built (`test_book.py`), so what you
 read is what EELisp does.
 
-**The companion workspace** — the folder as it stands after the chapters written so far — is one
-download: [zero-to-hero-workspace.zip](zero-to-hero-workspace.zip). Unzip it and open the
-*Zero-to-Hero* folder with **folder…** to start from any chapter. Its shortcut table, every key the
+**The companion workspace** — the folder as it stands at the end of the book, with its notes,
+forms, sheets, keybindings and a database holding everything the chapters typed — is one download: [zero-to-hero-workspace.zip](zero-to-hero-workspace.zip). Unzip it and open the
+*Zero-to-Hero* folder with **folder…** to see the finished system, or to start from any chapter. Its shortcut table, every key the
 book adds, is [readable here](workspace/.eeditor/keybindings.eelisp); in the repository the folder
 is `book/workspace/`.
 
@@ -24,30 +24,42 @@ is `book/workspace/`.
 
 ## Part II — Time
 
-3. **The agenda** — capture, dates, priorities, recurring items. *Being written.*
-4. **Rules that file for you** — categories and `defrule`. *Being written.*
-5. **Notes kept in step** — the PIM library: tasks in notes, refile, the clock, the tracker. *Being written.*
-6. **A dashboard** — live blocks for the week, the inbox and your streaks. *Being written.*
+3. [**The agenda**](03-the-agenda.md) — plain sentences, properties, things that repeat, and
+   asking it questions.
+4. [**Rules that file for you**](04-rules-that-file-for-you.md) — categories as paths, rules that
+   file every new item, and views for the questions you ask every day.
+5. [**Notes kept in step**](05-notes-kept-in-step.md) — the PIM: task lines that *are* agenda items,
+   capture, refile, reminders, the clock and the tracker.
+6. [**A dashboard**](06-a-dashboard.md) — live blocks for the week, money, what's late and your
+   streaks, refreshed with one key.
 
 ## Part III — Data
 
-7. **Tables** — accounts, holdings and transactions with `deftable`. *Being written.*
-8. **Forms** — a data-entry screen for transactions. *Being written.*
-9. **Sheets** — a budget on `sumif`, and where the money went. *Being written.*
+7. [**Tables**](07-tables.md) — accounts, transactions and holdings, and a key that turns
+   *coffee 3.50 #food* into a row.
+8. [**Forms**](08-forms.md) — a screen for transactions: controls, handlers, validation.
+9. [**Sheets**](09-sheets.md) — a Ledger poured from the table and a Budget against a plan, on
+   `sumif` and `countif`.
 
 ## Part IV — Markets
 
 10. [**Fetching prices**](10-fetching-prices.md) — crypto and exchange rates into a `prices`
-    table, on a key and every 15 minutes.
-11. **Keeping them fresh** — what changed, logged to the agenda. *Being written.*
-12. **A portfolio sheet** — holdings × latest price, profit and loss. *Being written.*
-13. **Alerts as agenda items** — "BTC below 50k — review", with a reminder. *Being written.*
+    table, on a key and on the clock.
+11. [**Keeping them fresh**](11-keeping-them-fresh.md) — the change since the fetch before, big
+    moves in today's note, a table that stays small.
+12. [**A portfolio sheet**](12-a-portfolio-sheet.md) — holdings × latest price: value, gain, the
+    total in two currencies, recalculated on every fetch.
+13. [**Alerts as agenda items**](13-alerts-as-agenda-items.md) — "bitcoin below 85000 — review",
+    a task for today and a notification, once a day.
 
 ## Part V — Putting it together
 
-14. **The markets desk** — one form: a watchlist, the portfolio sheet, refresh and add buttons. *Being written.*
-15. **The weekly review** — one key that writes the week's review note. *Being written.*
-16. **Sharing and backup** — the desk as one HTML file, CSV in and out, what lives where. *Being written.*
+14. [**The markets desk**](14-the-markets-desk.md) — one form, three pages: the watchlist, the
+    portfolio sheet itself, and the alerts.
+15. [**The weekly review**](15-the-weekly-review.md) — the PIM's review with a money section,
+    all of it live.
+16. [**Sharing and backup**](16-sharing-and-backup.md) — what lives where, a backup you can read,
+    keys kept private, and a form as one HTML file.
 
 ## Conventions
 

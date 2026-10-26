@@ -1,0 +1,56 @@
+;; Transactions.eeform — money in and out, one row at a time, with the latest rows underneath.
+;; Zero to Hero, chapter 8. Needs the tables from chapter 7.
+
+(form "Transactions" :size (600 520) :on-load tx-load
+  (label    lblDay      :text "Day" :at (16 20) :size (80 24))
+  (date     dtDay       :required true :at (104 16) :size (160 28))
+  (label    lblAmount   :text "Amount" :at (16 56) :size (80 24))
+  (textbox  txtAmount   :number true :min 0 :required true :placeholder "3.50" :at (104 52) :size (120 28))
+  (checkbox chkIn       :text "money in" :at (236 56) :size (120 24))
+  (label    lblCategory :text "Category" :at (16 92) :size (80 24))
+  (dropdown ddCategory  :items ("food") :required true :at (104 88) :size (160 28))
+  (label    lblAccount  :text "Account" :at (16 128) :size (80 24))
+  (dropdown ddAccount   :items ("Card") :required true :at (104 124) :size (160 28))
+  (label    lblNote     :text "Note" :at (16 164) :size (80 24))
+  (textbox  txtNote     :placeholder "what for" :at (104 160) :size (300 28))
+  (button   btnSave     :text "Save" :submit true :default true :at (104 200) :size (90 30) :on-click tx-save)
+  (button   btnDelete   :text "Delete selected" :at (204 200) :size (130 30) :on-click tx-delete)
+  (label    lblStatus   :at (344 204) :size (240 24))
+  (grid     grdRecent   :columns ("day" "account" "amount" "category" "note") :sortable true :filter true
+                        :at (16 244) :size (568 236))
+  (label    lblTotal    :at (16 488) :size (568 24)))
+
+(def tx-categories (list "food" "rent" "bills" "transport" "fun" "health" "salary" "savings" "other"))
+
+(defn tx-month-start () (str (substr *date* 0 8) "01"))
+
+(defn tx-refresh ()
+  (ui-set "grdRecent" :rows (query transactions :order "day" :desc true :limit 100))
+  (ui-set "lblTotal" :text (str "Spent since " (tx-month-start) ": " (spent (tx-month-start) *date*))))
+
+(defn tx-load (f)
+  (ui-set "dtDay" :value *date*)
+  (ui-set "ddCategory" :items tx-categories)
+  (ui-set "ddAccount" :items (map (fn (r) (field-get r :name)) (records (query accounts :order "name"))))
+  (ui-set "ddAccount" :value default-account)
+  (tx-refresh))
+
+(defn tx-save (f)
+  (let (amount (ui-get f "txtAmount")
+        signed (if (ui-get f "chkIn") amount (- 0 amount)))
+    (insert transactions {:day (ui-get f "dtDay") :account (ui-get f "ddAccount") :amount signed
+                          :category (ui-get f "ddCategory") :note (or (ui-get f "txtNote") "")})
+    (ui-set "txtAmount" :value "")
+    (ui-set "txtNote" :value "")
+    (ui-set "chkIn" :value false)
+    (ui-set "lblStatus" :text (str "Saved " signed " · " (ui-get f "ddCategory")))
+    (ui-focus "txtAmount")
+    (tx-refresh)))
+
+(defn tx-delete (f)
+  (let (row (ui-get f "grdRecent"))
+    (if (nil? row)
+        (ui-message "Pick a row first")
+        (do (delete transactions (dict-get row "id"))
+            (ui-set "lblStatus" :text "Deleted")
+            (tx-refresh)))))

@@ -411,7 +411,8 @@ def by_topic(keys: list[str]) -> list[tuple[tuple, list[str]]]:
 
 
 ORIGIN = {"book": "Book", "eeditor": "EEditor", "eelisp": "EELisp", "sample-workspace": "Sample"}
-EEDITOR_CODE = ["src/sheets/functions.eelisp", "src/keybindings/default.eelisp", "src/keybindings/prelude.eelisp", "docs/pim/pim.eelisp"]
+EEDITOR_CODE = ["src/sheets/functions.eelisp", "src/keybindings/default.eelisp", "src/keybindings/prelude.eelisp",
+                "docs/pim/pim.eelisp", "docs/pim/Capture.eeform"]
 
 
 def tracked(repo: Path, *patterns: str) -> list[str]:
@@ -884,7 +885,8 @@ def build(eeditor: Path, eelisp: Path, out: Path, regen: bool, sample: Path | No
     }
 
     library = build_library(files, out, eelisp)
-    zip_workspace(HERE / "book" / "workspace", out / "library" / "book" / "zero-to-hero-workspace.zip")
+    zip_workspace(HERE / "book" / "workspace", out / "library" / "book" / "zero-to-hero-workspace.zip",
+                  HERE / "book" / "workspace-made")
     synced = sync_content(files, sample_made(files)) if sync else []
 
     page = read(HERE / "catalog" / "index.html")
@@ -920,15 +922,18 @@ def build(eeditor: Path, eelisp: Path, out: Path, regen: bool, sample: Path | No
     return {"items": len(items), "counts": counts, "meta": meta, "library": len(library), "synced": synced}
 
 
-def zip_workspace(src: Path, dest: Path) -> None:
-    """The companion workspace as one download, unpacking to a folder named Zero-to-Hero."""
+def zip_workspace(src: Path, dest: Path, made: Path | None = None) -> None:
+    """The companion workspace as one download, unpacking to a folder named Zero-to-Hero: the
+    files the book has you write, and what running it made — the database and the sheets
+    (test_book.py --assemble keeps those in book/workspace-made)."""
     if not src.exists():
         return
     dest.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
-        for f in sorted(src.rglob("*")):
-            if f.is_file() and f.name not in (".DS_Store",) and not f.name.startswith("eeditor.db"):
-                z.write(f, "Zero-to-Hero/" + f.relative_to(src).as_posix())
+        for root in [src] + ([made] if made and made.exists() else []):
+            for f in sorted(root.rglob("*")):
+                if f.is_file() and f.name != ".DS_Store":
+                    z.write(f, "Zero-to-Hero/" + f.relative_to(root).as_posix())
 
 
 def sample_made(files: dict[str, Path]) -> str:

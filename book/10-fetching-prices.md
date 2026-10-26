@@ -5,7 +5,7 @@ internet into a table of your own, with a key to refresh them and a clock that d
 Everything later — the portfolio sheet, the alerts, the desk form — reads this table.
 
 You need the `(on-load …)` from [chapter 2](02-your-first-shortcut.md) and an internet connection.
-(Chapters 3–9 are being written; this one doesn't depend on them.)
+Nothing here depends on Part III — you can read Part IV first.
 
 ## Where prices come from
 
@@ -176,7 +176,11 @@ Put it all in your keybindings file, so it's there every time EEditor starts:
 (bind "Mod-Shift-q"
   (let (n (refresh-prices))
     (ed-message (if (= n 0) "No prices — the services said no; try again in a minute" (str n " prices saved")))))
+```
 
+And the clock:
+
+```eelisp keys superseded
 ;; every 15 minutes while EEditor is open, quietly
 (on-tick
   (when (= (mod (->number (second (str-split *time* ":"))) 15) 0)
