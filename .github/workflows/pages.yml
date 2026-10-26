@@ -1,0 +1,58 @@
+# Build the catalog from the two repositories and publish it to GitHub Pages: on every push here,
+# every morning (so a change merged in eeditor-next or eelisp-rs shows up by the next day), and on
+# demand from the Actions tab.
+name: Catalog
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: eeditor-docs
+      - uses: actions/checkout@v4
+        with:
+          repository: santacroce-tech/eeditor-next
+          path: eeditor-next
+      - uses: actions/checkout@v4
+        with:
+          repository: santacroce-tech/eelisp-rs
+          path: eelisp-rs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # --regen rebuilds the EELisp book from the engine's source first, so it can't lag behind it
+      - name: Build
+        run: python3 eeditor-docs/build.py --eeditor eeditor-next --eelisp eelisp-rs --out _site --regen
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

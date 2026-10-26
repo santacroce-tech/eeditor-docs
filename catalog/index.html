@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EEditor &amp; EELisp catalog</title>
+<meta name="description" content="Tutorials, manuals and a searchable index of every function and command in EEditor and the EELisp language.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="catalog.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap top-row">
+    <a class="brand" href="#"><span class="logo" aria-hidden="true">λ</span><span class="brand-text">EEditor &amp; EELisp</span></a>
+    <nav>
+      <a href="#start">Start</a>
+      <a href="#documents">Documents</a>
+      <a href="#catalog">Catalog</a>
+      <a href="#about">About</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<section class="hero">
+  <div class="wrap">
+    <h1>Everything EEditor and EELisp can do, in one place</h1>
+    <p class="lede">
+      <strong>EEditor</strong> is a notes editor with an agenda, spreadsheets, forms and mind maps.
+      <strong>EELisp</strong> is the small Lisp inside it, which you can also embed on its own.
+      This catalog collects the tutorials and manuals of both, and an index of every function and
+      command you can call.
+    </p>
+    <div class="versions">
+      <span class="pill">EEditor <b>{{EEDITOR_VERSION}}</b></span>
+      <span class="pill">EELisp <b>{{EELISP_VERSION}}</b></span>
+      <span class="pill muted">{{TOTAL}} entries in the catalog</span>
+    </div>
+    <div class="actions">
+      <a class="btn primary" href="eeditor/tutorial.html">Start the tutorial</a>
+      <a class="btn" href="#catalog">Search the catalog</a>
+      <a class="btn" href="eeditor/download.html">Download EEditor</a>
+    </div>
+  </div>
+</section>
+
+<section id="start" class="band">
+  <div class="wrap">
+    <h2>A path through it</h2>
+    <p class="sub">New to both? Take these in order. Each step stands on its own if you'd rather jump in.</p>
+    <ol class="path">
+      <li><a href="eeditor/download.html"><b>Install EEditor</b><span>macOS, Windows or Linux — free, no account. Or try the example apps in your browser first.</span></a></li>
+      <li><a href="eeditor/tutorial.html"><b>Your first hour</b><span>A folder, two linked notes, an agenda that files things for you, a shortcut of your own, a form.</span></a></li>
+      <li><a href="https://github.com/santacroce-tech/eeditor-next/blob/main/docs/PIM.md"><b>The PIM tutorial</b><span>Inside the app: open an empty folder and accept the samples — fifteen lessons on the agenda, each saying what to press.</span></a></li>
+      <li><a href="eeditor/manual.html"><b>The manual</b><span>Every feature, chapter by chapter: notes, agenda, sheets, forms, the REPL, keybindings.</span></a></li>
+      <li><a href="eelisp/docs.html"><b>Learn the language</b><span>The EELisp book: syntax, data, the database, the agenda and sheets from code.</span></a></li>
+      <li><a href="#catalog"><b>Look anything up</b><span>Search builtins, spreadsheet functions, snippets, editor commands and shortcuts below.</span></a></li>
+      <li><a href="eelisp/embed.html"><b>Embed the engine</b><span>Put EELisp in your own Rust program, in a browser, or behind a JSON pipe.</span></a></li>
+    </ol>
+  </div>
+</section>
+
+<section id="documents">
+  <div class="wrap">
+    <h2>Documents</h2>
+    <div class="cols">
+      <div>
+        <h3 class="col-head">EEditor — the app</h3>
+        {{EEDITOR_DOCS}}
+      </div>
+      <div>
+        <h3 class="col-head">EELisp — the language</h3>
+        {{EELISP_DOCS}}
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="catalog" class="band">
+  <div class="wrap">
+    <h2>The catalog</h2>
+    <p class="sub">Every function, command and shortcut. Type to search names, signatures and descriptions. Press <kbd>/</kbd> to jump here.</p>
+    <div class="search">
+      <input id="q" type="search" placeholder="countif, sheet-, date, agenda…" autocomplete="off" spellcheck="false" aria-label="Search the catalog">
+      <span id="count" class="count" aria-live="polite"></span>
+    </div>
+    <div id="chips" class="chips" role="group" aria-label="Show"></div>
+    <ul id="results" class="results"></ul>
+    <p id="empty" class="empty" hidden>Nothing matches. Try part of a name, or a word from what it does.</p>
+  </div>
+</section>
+
+<section id="about">
+  <div class="wrap about">
+    <div>
+      <h2>About this catalog</h2>
+      <p>
+        It is built from the two repositories, not written by hand: the manuals and sites are copied
+        from them, and the catalog is read from the engine's own function reference, the spreadsheet
+        library, the snippets and the keybindings file. It is rebuilt every day and whenever this
+        repository changes, so what you read here is what the code does.
+      </p>
+      <p class="meta">Built {{BUILT}} · eeditor-next <code>{{EEDITOR_SHA}}</code> · eelisp-rs <code>{{EELISP_SHA}}</code> · also as <a href="catalog.json">catalog.json</a></p>
+    </div>
+    <div>
+      <h2>The projects</h2>
+      <ul class="links">
+        <li><a href="https://eeditor.app">eeditor.app</a> — the app's home</li>
+        <li><a href="https://eelisp.app">eelisp.app</a> — the language's home</li>
+        <li><a href="https://github.com/santacroce-tech/eeditor-next">santacroce-tech/eeditor-next</a> — the app's source</li>
+        <li><a href="https://github.com/santacroce-tech/eelisp-rs">santacroce-tech/eelisp-rs</a> — the engine's source</li>
+        <li><a href="https://github.com/santacroce-tech/eeditor-docs">santacroce-tech/eeditor-docs</a> — this catalog</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    EEditor and EELisp are free software under the MIT licence, developed by Roberto Santacroce Martins. © 2026
+  </div>
+</footer>
+
+<script type="application/json" id="data">{{DATA}}</script>
+<script src="catalog.js"></script>
+</body>
+</html>
