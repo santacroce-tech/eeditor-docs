@@ -124,10 +124,25 @@ keys stay as they were; if your file already says what opens at launch, the PIM'
 left out. Run it again after an update to EEditor and it replaces what's between the markers —
 nothing else. (The sample notes put the PIM in with the same markers.)
 
-It also puts three buttons in the editor's header — **↻ update** (⌘⌥U),
-**✓ task** (⌘⌥T) and **⌫ delete** (⌘⌥⌫). They are the `(button …)` lines at the end of the file:
+It also puts two buttons in the editor's header — **↻ update** (⌘⌥U), which recomputes the note's
+blocks, and **⇄ sweep** (⌘⌥S), which brings every note in step with the agenda. They are the
+`(button …)` lines at the end of the file:
 `(button "label" "Mod-Alt-u")` clicks a key, and any body a `bind` takes works too. Change them
 there — but outside the markers, or the next install puts the PIM's back.
+
+**Every key is in ⌘P's actions, by name.** Press ⌘⇧P (or type `>` in ⌘P) and type what you want —
+`sweep`, `clock`, `refile`, `scan tasks` — then ↵: it runs in the note in front, and its key is shown
+beside it. A key's name is the start of the comment above its `(bind …)`: `;; ⌘⌥S — Sweep: scan
+every note…` is *Sweep*. The PIM adds a few that have no key, as `(action …)` lines:
+
+| Action | Does |
+|---|---|
+| Insert the tasks in a category… | asks which, then puts `(pim-category "…")` at the caret |
+| Insert a board of a category… | the same with `(pim-board "…")` — its children as columns |
+| Insert today's agenda / the inbox / the undated tasks | `(pim-agenda 1)`, `(pim-inbox)`, `(pim-someday)` |
+| Open the Agenda window | the big window, with its Board tab |
+
+Add your own outside the markers, e.g. `(action "Work tasks here" (pim-insert-block "(pim-category \"work\")"))`.
 
 **Pasted in by hand earlier?** Install anyway: EEditor offers to replace that copy with the
 current one, keeps your own keys and settings around it, saves the file as it was as
