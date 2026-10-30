@@ -55,6 +55,50 @@ The agenda panel re-reads the items after every keybinding, form event and REPL 
 app change in `src/main.ts`, beside the sheet refresh that was already there). You never press
 refresh. The one exception: it doesn't redraw while you're typing in it.
 
+**The agenda, big.** ⤢ above the sidebar's agenda opens `pim/Agenda.eeform` filling the window —
+everything this guide and `TRY ME.md` walk through, as an interface: *Start here* (is the PIM live,
+every key), *Agenda* (quick add with the PIM's parse, filters, an editor for one item), *Board* (below), *In notes*
+(the unlinked `- [ ]` lines, to link or open), *Capture*, *Clock* (in on an item or anything, out, the
+report), *Tracker* and *Review*. Install the PIM keys… puts it there (a copy that differs is kept as
+`.eeditor/Agenda.before-<date>.eeform` first, and an older install's `pim/TRYME.eeform` is moved there
+too); without it, ⤢ opens `examples/Agenda.eeform`.
+
+**The sidebar's agenda is a form.** The PIM's `(panel "agenda" "pim/Side.eeform")` line draws
+`pim/Side.eeform` in the agenda section in place of the built-in list: a quick-add box (the PIM's
+parse, filed under the category picked), *N overdue · N today · N open*, every category with how many
+open items it holds (its children's too, indented under it — pick one to list only those), and the
+items by date, overdue first; ✓ finishes the one picked, ⤢ (or a double-click) opens the Agenda
+window. It is an ordinary form: open it in the designer to move things, add a control, change what
+the list shows — it's drawn as wide as the sidebar (controls anchored left and right stretch) and its
+`:on-refresh` handler runs whenever the agenda may have changed, as the built-in list reloads. Point
+the line at a form of your own, or take it out for the built-in list. Any other name is a sidebar
+section of its own, under the agenda: `(panel "Habits" "habits.eeform")`. Install the PIM keys…
+writes `pim/Side.eeform` (a copy that differs is kept as `.eeditor/Side.before-<date>.eeform`).
+
+**Typed a `- [ ]` by hand?** It is only text until it's linked, so it isn't an agenda item yet. The
+panel lists those lines under its items, in a folding group — *in notes, not in the agenda · N* —
+by note. Click one to open its note at that line; **＋** makes it an item and links the line, the
+same as ⌘⌥A on it (with the PIM loaded it is the PIM's own parse: tags, notes, rules). Lines in
+``` fences are examples and aren't listed.
+
+**The tags section is a form too.** `(panel "tags" "pim/Tags.eeform")` puts `pim/Tags.eeform` in
+place of the tag cloud: a box to narrow the tags, every `#tag` with how many notes have it — the PIM
+reads `#work/l2l` as `work/l2l`, under `work`, whose count takes in its children's notes, as a
+category's does — and the notes with the tag picked; click one to open it. **⇩ links into the note**
+(or ⌘⌥B, which asks for the tag) puts a block in the note in front — `<!-- eel: (pim-tagged "work") -->`
+— with a `[[link]]` to each of them, the note itself left out; ⌘⌥U keeps it current, like the task
+lists. Tags count where the cloud's do: not in headings or ``` fences, not mid-word, not `{#12}`. It
+refreshes when a note is saved.
+
+**A board.** The Agenda window's *Board* tab is a kanban of your categories: pick one in
+*Columns* and its children are the columns — `work/l2l`, `work/admin`, then `work` itself for what is
+filed under it alone — or the top-level categories, with *no category* last. An item shows once, in
+the first column that holds it. Drag a card to another column (or ⌥← / ⌥→ on the one picked) and
+the item is refiled: out of the categories that put it in the column it left, under the new one.
+Double-click a card to edit it on the *Agenda* tab. **⇩ Into the note** puts the same board in the
+note in front, as a markdown table in a block — `<!-- eel: (pim-board "work") -->` — that ⌘⌥U keeps
+fresh, the preview draws and the PDF prints. The tab is the `board` form control, there for any form.
+
 ---
 
 ## Try it first
@@ -75,12 +119,12 @@ again on the day you try it (it starts from scratch each time). It needs the eng
 **One command:** right-click the workspace in the file tree and choose **Install the PIM keys…**
 (or run the `install-pim` command — `(ed-cmd "install-pim")` at the REPL, or bind it to a key). It
 adds the PIM to the end of the folder's keybindings between two marker lines, copies the capture
-window to `pim/Capture.eeform`, and reloads: ⌘⌥K says *No clock running* straight away. Your own
+window to `pim/Capture.eeform` and the PIM's big window to `pim/Agenda.eeform`, and reloads: ⌘⌥K says *No clock running* straight away. Your own
 keys stay as they were; if your file already says what opens at launch, the PIM's `(on-start …)` is
 left out. Run it again after an update to EEditor and it replaces what's between the markers —
 nothing else. (The sample notes put the PIM in with the same markers.)
 
-It also puts three buttons in the editor's header, beside the theme button — **↻ update** (⌘⌥U),
+It also puts three buttons in the editor's header — **↻ update** (⌘⌥U),
 **✓ task** (⌘⌥T) and **⌫ delete** (⌘⌥⌫). They are the `(button …)` lines at the end of the file:
 `(button "label" "Mod-Alt-u")` clicks a key, and any body a `bind` takes works too. Change them
 there — but outside the markers, or the next install puts the PIM's back.
@@ -137,6 +181,7 @@ to what the file says.
 | `org-journal` / datetree | Daily note from a template (agenda block, Log, Notes) | ⌘D |
 | Weekly review | `reviews/<monday> week.md`: done, time, tracker, next 7 days, undated, prompts | ⌘⌥V |
 | Tags `:work:` | `#work` in text (tags panel); in ⌘⌥A each `#tag` also becomes an agenda category; ⌘⌥G picks one from a list | ⌘⌥G |
+| `org-tags-view` | The tags panel lists a tag's notes; `(pim-tagged "work")` is a block of links to them | ⌘⌥B |
 | Links `[[…]]`, backlinks | Same syntax, ⌘-click, backlinks bar | — |
 | `org-babel` | ```` ```eelisp ```` blocks, ⌘⇧Enter runs the one at the caret | ⌘⇧Enter |
 | Tables + formulas | Sheets (`.eesheet`) with EELisp formulas; `browse` for a table widget | — |
@@ -222,6 +267,11 @@ The library's building blocks, all callable in blocks, the REPL and your own bin
 | `(pim-someday)` | agenda items with no date |
 | `(pim-inbox)` | what capture put in the inbox (the `pim-inbox` view) |
 | `(pim-category c)` | the items in a category and its children |
+| `(pim-tagged t)` | a `[[link]]` to each note with `#t` (or a child, `#t/x`), the note it is in left out — ⌘⌥B inserts it |
+| `(pim-note-tags text)` / `(pim-tag-names)` / `(pim-tagged-paths t)` | a note's tags; every tag in the notes (parents of nested ones too); the notes with one |
+| `(pim-board c)` | a markdown table, a column per child of `c` (and `c` itself) with its items — `""` for the top-level categories |
+| `(pim-board-lanes c)` / `(pim-board-rows c)` | a board's columns, and its cards as dicts (`:id :text :when :lane`) — what the Board tab draws |
+| `(pim-board-move id c from to)` | a card moved: the item out of the categories that put it in `from`, filed under `to` |
 | `(pim-done-report from to)` | what you finished, from the `done` table |
 | `(pim-clock-report from to)` | a markdown table of time per task, with a total |
 | `(pim-track-report from to)` | tracker totals per kind: `drink 5 un · exercise 90 min · …` |

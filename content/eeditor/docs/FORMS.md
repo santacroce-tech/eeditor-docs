@@ -76,7 +76,13 @@ presses it, `:cancel` — Escape does), `checkbox`, `radio` (`:items`, one chose
 (`:items`), `listbox` (`:items`), `grid` (`:columns`, `:rows`; `:editable` — double-click a cell to
 type into it, and `:on-edit` gets the row as edited; `:sortable` — click a header; `:filter` — a
 box that narrows the rows to those containing the text; `:page-size` — pages, with ‹ › and a
-row count), `date` (`:value` as `yyyy-mm-dd`;
+row count), `board` (a kanban — `:rows` as cards, in a column per value of each row's `:lane-by`
+field, `"lane"` unless set; `:lanes` gives the columns and their order, empty ones too — left out,
+they are the rows' own; `:card` the field a card shows, `"text"`, and `:sub` a second line under it.
+Drag a card to another column, or ⌥← / ⌥→ on the one picked: it moves there at once and
+`:on-move` runs with `$from` and `$to` in the form's state — `(ui-get f "$to")` — to make it so in
+the data; the board's value is the card picked, a dict like a grid's row, and `:on-change` /
+`:on-dblclick` work as on a grid), `date` (`:value` as `yyyy-mm-dd`;
 `:min`, `:max`), `image` (`:src`, a path beside the form like a note's `![](assets/x.png)`), `timer`
 (`:interval` ms; nothing to see, fires `:on-tick` while enabled), `tabs` (`:pages`, `:value` the
 open one), `sheet` (`:file`, a `.eesheet` beside the form — the live grid, with its formula bar
@@ -105,15 +111,30 @@ are matched across the form, so give two tabs controls different page names.
 text must match) — with the first offender marked, focused and named ("Age must be at most 150");
 then the button's `:on-validate` handler, a function of the form that returns a message to refuse
 or nil to go ahead; then `:on-click`. Every control has a name, `:at (x y)`, `:size (w h)`,
-`:enabled`, `:visible`; the value-bearing ones take `:required`. The order of the controls in the
+`:enabled`, `:visible`, `:anchor`; the value-bearing ones take `:required`. **Maximize and
+anchors**: a form in a window has ⤢ in its title bar (a double-click on the title does the same) —
+the window fills the app, and is remembered so per form. The form is still laid out at its `:size`;
+`:anchor "tlbr"` says which sides of the form a control keeps its distance to when there is more
+room: anchored left *and* right it grows wider, right only it moves with the right edge (the same for
+top and bottom). Unset is `"tl"` — it stays where it was drawn. So a grid is `"tlbr"`, the buttons
+under it `"lb"`, an editor panel down the right `"tr"`. A form never lays out smaller than drawn. The order of the controls in the
 file is the Tab order when the form runs (the *Order* buttons in the properties move a control).
 **Events**: `:on-click` (button), `:on-change` (anything with a value — a
 textbox when editing ends, a checkbox, a radio group, a dropdown, a date, a listbox or grid when the
-selection moves), `:on-dblclick` (a listbox or grid row), `:on-validate` (a button), `:on-tick` (a
+selection moves), `:on-dblclick` (a listbox or grid row, a board's card), `:on-move` (a board's card dragged to another lane), `:on-validate` (a button), `:on-tick` (a
 timer), `:on-load` (the form), `:on-public` (the form — another form of its main wrote a public variable),
 `:on-close` (the form — asked before it closes, by its stop/✕ button, `(ui-close)`, a frame's Close or ×,
 or the main form holding it closing: a message refuses and is shown, nil lets it go; the forms in a
-form's frames are asked before the form itself).
+form's frames are asked before the form itself), `:on-refresh` (the form, drawn in the sidebar — see below).
+
+**A form in the sidebar**: `(panel "agenda" "pim/Side.eeform")` in `.eeditor/keybindings.eelisp`
+draws a form in the sidebar's agenda section, in place of the built-in list; `"tags"` puts one in the
+tags section in place of the cloud; any other name, `(panel "Habits" "habits.eeform")`, is a section
+of its own. It runs there with no title bar, as wide as the
+section (anchor controls `"tlr"` to stretch with it) and at least its `:size` tall, and its
+`:on-refresh` handler runs when a note is saved and whenever the agenda may have changed — after a key, the REPL, another
+form's event — which is how it stays current; evals it makes itself don't ask for another. Saving the
+form's file runs the new version there. `(ui-close)` takes it out until the keybindings are reloaded.
 
 **The handler's world** (`src/forms/prelude.eelisp`, loaded once before the first event):
 
@@ -267,6 +288,7 @@ tree, open from disk with the network off, reload).
 | `Tables.eeform` | Any table: pick it from `(tables)`, a WHERE / order / limit that shows the `(query …)` it ran, cells edited in place, new row, delete, pack. The table is named by an expression — `(query (str name))`. |
 | `Orders.eeform` | Master–detail: customers, the picked one's orders (`:where "customer = ?"`), a worked-out amount column and a total. |
 | `Office.eeform` | The others as one app: a `:main` form with a screens frame, their menus merged into its bar, and the last screen remembered in a `:persist` public variable. |
+| `docs/pim/Agenda.eeform` | The PIM as one window (installed as `pim/Agenda.eeform`; ⤢ on the sidebar's agenda opens it maximized): seven tabs — setup check and every key, the agenda big, the notes' unlinked tasks, capture, the clock, the tracker, the review. Anchors throughout, so it uses a maximized window. |
 | `Agenda.eeform` | The agenda PIM through most of the controls: tabs, menu, datagrid, date, radio, dropdowns, checkbox, timer. Items by due date, an editor for one (`item->dict` reads it), quick add with a `smart-parse` preview, categories, rules, saved views. |
 
 `defcategory`, `defrule` and `defview` take their arguments unevaluated, so the Agenda form writes
