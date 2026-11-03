@@ -305,6 +305,7 @@ CROSS_LINKS = {
     "https://eeditor.app/manual.html": "../eeditor/manual.html",
     "https://eeditor.app/tutorial.html": "../eeditor/tutorial.html",
     "https://eeditor.app/download.html": "../eeditor/download.html",
+    "https://eeditor.app/msx.html": "../eeditor/msx.html",
 }
 
 
@@ -373,17 +374,22 @@ TOPICS = [
      [r"eeditor/docs/SPREADSHEET\.md", r"eelisp/docs/07-", r"eeditor/src/sheets/", r"eeditor/docs/SHEETS-LATER\.md"]),
     ("forms", "Database and forms", "dBASE-style tables on SQLite, and forms you draw and run — with the example forms.",
      [("Manual — forms", "eeditor/manual.html#forms"), ("The Office app", "eeditor/apps/Office.html")],
-     [r"eelisp/docs/05-", r"eeditor/docs/FORMS\.md", r"eeditor/docs/FORM-APPS\.md", r"sample-workspace/.*\.eeform"]),
+     [r"eelisp/docs/05-", r"eeditor/docs/FORMS\.md", r"eeditor/docs/FORM-APPS\.md",
+      r"sample-workspace/(?!examples/(Spectrum|Display|Raycaster|MSX)\.eeform).*\.eeform"]),
     ("keys", "Keybindings and snippets", "The shortcut table is EELisp: the defaults, the editor commands it can call, and the snippets bundle.",
      [("Manual — keybindings", "eeditor/manual.html#keybindings")],
      [r"eeditor/src/keybindings/default", r"eeditor/src/keybindings/", r"sample-workspace/\.eeditor/",
       r"eeditor/src/snippets/README\.md", r"eeditor/src/snippets/"]),
+    ("games", "Screens, games and machines", "The screen a form draws on — pictures, keys, sound — and what runs on it: a raycaster, a ZX Spectrum, an MSX, and a tutorial that writes an MSX game in Z80 assembly.",
+     [("Make an MSX game", "eeditor/msx.html"), ("The MSX", "eeditor/apps/MSX.html"), ("The Raycaster", "eeditor/apps/Raycaster.html")],
+     [r"eeditor/docs/msx/TUTORIAL\.md", r"eeditor/docs/DISPLAY\.md", r"eeditor/docs/msx/", r"eeditor/docs/spectrum/",
+      r"sample-workspace/examples/(Display|Raycaster|MSX|Spectrum)\.eeform"]),
     ("architecture", "Architecture and embedding", "How the engine is built, using it from Rust, JSON or a browser, and the plan behind the rebuild.",
      [("Embedding", "eelisp/embed.html")],
      [r"eelisp/docs/09-", r"eelisp/docs/10-", r"eelisp/web/", r"eeditor/docs/ANALYSIS\.md"]),
-    ("project", "The project", "The roadmap, releasing, the websites, themes, the ZX Spectrum, the app's native plugins, and the licences.",
+    ("project", "The project", "The roadmap, releasing, the websites, themes, the app's native plugins, and the licences.",
      [("Download", "eeditor/download.html")],
-     [r"eeditor/docs/ROADMAP\.md", r"eeditor/docs/RELEASING\.md", r".*/site/README\.md", r"eeditor/docs/themes/", r"eeditor/docs/spectrum/",
+     [r"eeditor/docs/ROADMAP\.md", r"eeditor/docs/RELEASING\.md", r".*/site/README\.md", r"eeditor/docs/themes/",
       r"eeditor/src-tauri/", r".*/LICENSE$"]),
     ("other", "Other", "Documents not filed under a topic yet.", [], [r".*"]),
 ]
@@ -873,7 +879,8 @@ def build(eeditor: Path, eelisp: Path, out: Path, regen: bool, sample: Path | No
             ("Tutorial — your first hour", "eeditor/tutorial.html", "Seven steps from an empty folder to linked notes, an agenda that files things for you, a shortcut of your own and a form.", chapters(read(eeditor / "site" / "tutorial.html"))),
             ("Manual", "eeditor/manual.html", "Everything the app does, chapter by chapter, with a shortcut reference at the end.", chapters(manual)),
             ("Download and release notes", "eeditor/download.html", "Installers for macOS, Windows and Linux, and what changed in each version.", []),
-            ("Example apps", "eeditor/apps/Office.html", "Forms exported as single HTML files that run in your browser — Office and Functions — and the example .eeform files.", []),
+            ("Make an MSX game", "eeditor/msx.html", "A snake game for the MSX1 in Z80 assembly, in five steps — each a cartridge that runs in your browser.", chapters(read(eeditor / "site" / "msx.html"))),
+            ("Example apps", "eeditor/apps/Office.html", "Forms exported as single HTML files that run in your browser — Office, Functions, the Raycaster, the MSX — and the example .eeform files.", []),
             ("eeditor.app home", "eeditor/index.html", "What EEditor is, in one page.", []),
         ],
         "eelisp": [
