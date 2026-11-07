@@ -37,7 +37,7 @@ with no dependency on the rest of the app beyond the engine client, so they coul
 | The designer | A **structured editor for one top-level form** of that file. The tab has three modes: *Design* (canvas + toolbox + properties), *Code* (the ordinary CodeMirror editor on the same text), *Run*. | Design edits rewrite only the `(form …)` region of the buffer, as one CodeMirror transaction — so ⌘Z in the designer is CodeMirror's undo, autosave and dirty tracking are the note's, and switching to *Code* shows exactly what will be saved. |
 | Events | A property naming a function: `(button btnSave :text "Save" :on-click save-contact)`. Double-clicking a control in the designer creates `(defn save-contact (f) …)` if it is missing and jumps to it. | The layout stays data and never has to parse code. A handler is a plain function, testable from the REPL: `(save-contact {:txtName "Ada"})`. |
 | The runtime | In the app. The form's state is handed to the handler as a dict; the handler *queues* changes with `(ui-set "lblStatus" :text "Saved")`, and the app applies the queue when the handler returns. | The engine has no way to reach the UI (see `keybindings/prelude.eelisp`), and a handler that returns commands as data is the pattern the app already has. `ui-set` reads as imperative code — `(ui-set …)` then `(ui-message …)` in a row — because a global queue and `set!` make it so, in pure EELisp. No Rust. |
-| Where code runs | *Run* evaluates the whole file (defining the handlers), then `:on-load`. Opening a form in *Design* runs nothing. | A `.eeform` from somewhere else must not run by being opened, the same rule as sheets and ```eelisp blocks. |
+| Where code runs | *Run* (▶ run, or F5) evaluates the whole file (defining the handlers), then `:on-load`. Opening a form asks *Run* or *Design* with `(forms-open "ask")` — the default file has it; ↵ and Escape are *Design* — runs it with `"run"`, and opens *Design*, running nothing, with `"design"` or no line at all. A new form, and an app imported from an exported page, always open in *Design*. | A `.eeform` from somewhere else must not run by being opened, the same rule as sheets and ```eelisp blocks — so the question's safe answer is the default one, and nothing runs without a click. |
 | Naming | This is a *form*. The engine's older `(edit contacts 1)` / `(defform …)` stay as the **instant** forms of the REPL. | Same word VB and FoxPro use; the REPL's record editor is a different, smaller thing and keeps its name. |
 
 ## The file
@@ -130,7 +130,17 @@ selection moves), `:on-dblclick` (a listbox or grid row, a board's card), `:on-m
 timer), `:on-load` (the form), `:on-public` (the form — another form of its main wrote a public variable),
 `:on-close` (the form — asked before it closes, by its stop/✕ button, `(ui-close)`, a frame's Close or ×,
 or the main form holding it closing: a message refuses and is shown, nil lets it go; the forms in a
-form's frames are asked before the form itself), `:on-refresh` (the form, drawn in the sidebar — see below).
+form's frames are asked before the form itself), `:on-refresh` (the form, drawn in the sidebar — see below —
+and any form once the file commands it gave `ui-editor` have been carried out), `:on-key` (the form — see below).
+
+**Keys.** A listbox or grid moves its pick with ↑ ↓, Home End and PageUp PageDown (`:on-change`
+hears it), and Enter is a double-click. `:on-key fm-key :keys ("Mod-Right" "Tab")` on the form gives
+it keys of its own: pressed anywhere in it but a text box, a key it names runs the handler with
+`$pressed` — the key as `(bind …)` writes it, modifiers in the order Mod, Ctrl, Alt, Shift — and
+`$control`, the control that had the focus. Those keys are the form's while it has the focus, ahead
+of the app's shortcuts (⌘B included, if it names it). With no `:keys` it takes every key with
+⌘/Ctrl/Alt and F1–F12. (`$key` was taken: it is the form's own path, beside `$form`, `$main`, `$app`.)
+`ui/formkeys.ts` is how the app's dispatcher asks a form first.
 
 **A form in the sidebar**: `(panel "agenda" "pim/Side.eeform")` in `.eeditor/keybindings.eelisp`
 draws a form in the sidebar's agenda section, in place of the built-in list; `"tags"` puts one in the
@@ -295,6 +305,7 @@ tree, open from disk with the network off, reload).
 | `Display.eeform` | A screen that isn't a Spectrum: an `"indexed"` frame of 160×100 drawn by EELisp a column at a time (`bfill`), at 35 frames a second, a square moved by the keys in `ui-held` and stripes moved by the clock in `ui-ms`; hold Space for a note made of samples (`"audio"`) whose pitch follows the square. |
 | `Raycaster.eeform` | A Wolfenstein-style maze on the same display: 320×200, one ray a column through the map grid (the DDA), textured walls drawn a run of one tone at a time, darker with distance, sliding doors (Space), barrels and lamps as sprites hidden behind nearer walls, sound as `"tones"` (doors, footsteps, a bump), a minimap, walking and turning on the held keys — 35 frames a second, about 10 ms a frame in the engine. No sin or cos: the view turns by rotating two vectors. |
 | `MSX.eeform` | An MSX1: the Spectrum's Z80 with the MSX around it — slots, the TMS9918A, the PPI, the PSG's registers (`src/msx/msx.eelisp`) — booting C-BIOS, the free BIOS that comes with it. **Demo** puts in a 335-byte cartridge (its listing is in the form) whose sprite the cursor keys move and whose note Space plays, on the PSG, as `"audio"`; **Load cartridge…** takes a `.rom` of up to 32 KB. 60 frames a second. `docs/msx/MSX.md`. |
+| `Files.eeform` | Two folders side by side, Norton Commander style: `(dir-list …)` into two grids (folders first, `../` on top), `:on-key` with `:keys` for Tab, ⌫, ⌘→/⌘← (move), ⌥⌘→/⌥⌘← (copy), ⌘⌫ (Trash), ⇧⌘→/⇧⌘← (the same folder in the other panel), ⌘G (go to a typed folder), Rename, New folder and Go to from a box — the changes are `ed-move`/`ed-copy`/`ed-delete`/`ed-mkdir` through `ui-editor`, and `:on-refresh` lists both panels again once they are done. Each panel's folder is a `:persist` public variable. At the top, the folders granted outside the workspace (`(roots)`, `~Downloads/`). |
 | `Office.eeform` | The others as one app: a `:main` form with a screens frame, their menus merged into its bar, and the last screen remembered in a `:persist` public variable. |
 | `docs/pim/Agenda.eeform` | The PIM as one window (installed as `pim/Agenda.eeform`; ⤢ on the sidebar's agenda opens it maximized): seven tabs — setup check and every key, the agenda big, the notes' unlinked tasks, capture, the clock, the tracker, the review. Anchors throughout, so it uses a maximized window. |
 | `Agenda.eeform` | The agenda PIM through most of the controls: tabs, menu, datagrid, date, radio, dropdowns, checkbox, timer. Items by due date, an editor for one (`item->dict` reads it), quick add with a `smart-parse` preview, categories, rules, saved views. |
