@@ -81,7 +81,6 @@ Sheets whose formulas are EELisp: the design, sheets from code, the spreadsheet 
 - [Spreadsheets — plan](eeditor/docs/SPREADSHEET.md) — EEditor · `docs/SPREADSHEET.md`
 - [7. Sheets](eelisp/docs/07-sheets.md) — EELisp · `docs/07-sheets.md`
 - [Spreadsheet functions for sheet formulas](eeditor/src/sheets/functions.eelisp) — EEditor · `src/sheets/functions.eelisp`
-- [Sheets — what's missing](eeditor/docs/SHEETS-LATER.md) — EEditor · `docs/SHEETS-LATER.md`
 
 ## Database and forms
 
